@@ -290,6 +290,141 @@ nav.tabs button.active{background:var(--accent-soft);color:var(--accent);}
 
 <script>
 /* ============================================================
+   PERSISTENCIA — fuente única compartida (localStorage)
+   Este bloque es idéntico en refactel.html y refactel-cliente.html.
+============================================================ */
+const DB_KEY = 'refactel_db_v1';
+const DB_VERSION = 1;
+
+const REVIEW_POOL = [
+  {author:'Ricardo M.', rating:5, comment:'Llegó rápido y quedó perfecta, se ve como original.'},
+  {author:'Daniela G.', rating:4, comment:'Buena calidad, un poco cara pero cumple muy bien.'},
+  {author:'Andrés P.', rating:5, comment:'Excelente, la instalé yo mismo sin problema.'},
+  {author:'Fernanda L.', rating:5, comment:'Superó mis expectativas, muy recomendable.'},
+  {author:'Jorge T.', rating:4, comment:'Todo bien, tardó un par de días extra en llegar.'},
+  {author:'Sofía R.', rating:5, comment:'Excelente atención y producto tal cual se describe.'},
+  {author:'Marco A.', rating:3, comment:'Funciona bien pero el empaque llegó algo golpeado.'},
+  {author:'Paola V.', rating:5, comment:'Muy buena refacción, duró mucho más que la anterior.'},
+  {author:'Iván C.', rating:4, comment:'Cumple lo que promete, buen precio comparado con otras tiendas.'},
+  {author:'Renata S.', rating:5, comment:'La compré para mi taller, excelente calidad y garantía.'},
+];
+const REVIEW_DATES = ['hace 2 días','hace 5 días','hace 1 semana','hace 2 semanas','hace 3 semanas','hace 1 mes'];
+function genReviews(seed, count){
+  const out = [];
+  for(let i=0;i<count;i++){
+    const r = REVIEW_POOL[(seed+i*3)%REVIEW_POOL.length];
+    out.push({author:r.author, rating:r.rating, comment:r.comment, date: REVIEW_DATES[(seed+i)%REVIEW_DATES.length]});
+  }
+  return out;
+}
+
+function seedDB(){
+  return {
+    version: 1,
+    products: [
+      {sku:'PANT-001', name:'Pantalla iPhone 11 OLED', cat:'pantallas', subcat:null, price:890, stock:14, desc:'Pantalla OLED de reemplazo compatible con iPhone 11, incluye digitalizador (touch). Alto brillo y color fiel al original, con protección contra rayones. Incluye herramientas básicas de instalación.', reviews:genReviews(0,3)},
+      {sku:'PANT-002', name:'Pantalla Samsung A32', cat:'pantallas', subcat:null, price:650, stock:9, desc:'Pantalla AMOLED de reemplazo para Samsung Galaxy A32, con marco incluido. Instalación sencilla y compatibilidad total con sensores originales.', reviews:genReviews(1,2)},
+      {sku:'PANT-003', name:'Pantalla iPhone 8', cat:'pantallas', subcat:null, price:420, stock:3, desc:'Pantalla LCD de reemplazo para iPhone 8, calidad grado A+. Ideal para talleres de reparación que buscan buena relación calidad-precio.', reviews:genReviews(2,2)},
+      {sku:'TAB-001', name:'Tableta de carga iPhone 12', cat:'tabletas', subcat:null, price:180, stock:20, desc:'Módulo de carga (dock connector) original compatible con iPhone 12. Incluye micrófono integrado y conector Lightning de alta durabilidad.', reviews:genReviews(3,2)},
+      {sku:'TAB-002', name:'Tableta de carga USB-C genérica', cat:'tabletas', subcat:null, price:95, stock:35, desc:'Módulo de carga USB-C universal, compatible con múltiples modelos Android. Fabricado con contactos reforzados para mayor vida útil.', reviews:genReviews(4,2)},
+      {sku:'FLEX-001', name:'Flexor de encendido iPhone X', cat:'flexores', subcat:null, price:120, stock:12, desc:'Cable flexor de botón de encendido/apagado para iPhone X. Fácil instalación, compatible 100% con el conector original.', reviews:genReviews(5,2)},
+      {sku:'FLEX-002', name:'Flexor de volumen Samsung S10', cat:'flexores', subcat:null, price:110, stock:8, desc:'Flexor de botones de volumen para Samsung Galaxy S10. Incluye contactos dorados anticorrosión.', reviews:genReviews(6,1)},
+      {sku:'BAT-001', name:'Batería iPhone 11', cat:'baterias', subcat:null, price:340, stock:6, desc:'Batería de reemplazo de alta capacidad para iPhone 11 (3110 mAh). Incluye chip de calibración para lectura correcta de porcentaje y salud de batería.', reviews:genReviews(7,3)},
+      {sku:'BAT-002', name:'Batería Samsung A21s', cat:'baterias', subcat:null, price:290, stock:2, desc:'Batería de reemplazo para Samsung A21s, capacidad original de fábrica. Certificada contra sobrecarga y cortocircuito.', reviews:genReviews(8,2)},
+      {sku:'TAP-001', name:'Tapa trasera iPhone 12 Pro', cat:'tapas', subcat:null, price:220, stock:11, desc:'Tapa trasera de cristal para iPhone 12 Pro, con orificio para cámara y logo. Acabado idéntico al original.', reviews:genReviews(9,2)},
+      {sku:'TAP-002', name:'Contratapa Xiaomi Redmi 9', cat:'tapas', subcat:null, price:150, stock:15, desc:'Contratapa trasera para Xiaomi Redmi 9, incluye botones laterales preinstalados. Varios colores disponibles bajo pedido.', reviews:genReviews(0,2)},
+      {sku:'HER-001', name:'Kit de destornilladores precisión', cat:'herramientas', subcat:null, price:180, stock:25, desc:'Kit de 24 piezas para reparación de celulares: desarmadores de precisión, espátulas, ventosa y palancas plásticas antiestática.', reviews:genReviews(1,3)},
+      {sku:'HER-002', name:'Estación de calor SMD', cat:'herramientas', subcat:null, price:1250, stock:4, desc:'Estación de aire caliente profesional para desoldado SMD, control digital de temperatura y flujo de aire. Ideal para reballing y microsoldadura.', reviews:genReviews(2,2)},
+      {sku:'INS-001', name:'Pegamento OCA UV 50ml', cat:'insumos', subcat:'liquidos', price:95, stock:30, desc:'Adhesivo líquido OCA de curado UV para laminado de pantallas. Transparencia óptica total, sin burbujas al curar.', reviews:genReviews(3,2)},
+      {sku:'INS-002', name:'Rollo de cinta 3M doble cara', cat:'insumos', subcat:'otros', price:60, stock:40, desc:'Cinta adhesiva de doble cara 3M para sellado de tapas traseras y fijación de componentes. Alta adherencia y resistencia al calor.', reviews:genReviews(4,1)},
+      {sku:'INS-003', name:'Mica de cristal templado universal', cat:'insumos', subcat:'glass', price:45, stock:60, desc:'Mica de cristal templado 9H, alta transparencia y oleofóbica anti-huella. Kit de instalación incluido.', reviews:genReviews(5,3)},
+      {sku:'INS-004', name:'Alcohol isopropílico 100ml', cat:'insumos', subcat:'liquidos', price:70, stock:25, desc:'Alcohol isopropílico al 99.9% para limpieza de componentes electrónicos antes de reparación. Evapora sin dejar residuo.', reviews:genReviews(6,2)},
+      {sku:'INS-005', name:'Hilo de soldar 0.6mm', cat:'insumos', subcat:'hilos', price:55, stock:18, desc:'Hilo de estaño para soldadura de precisión, diámetro 0.6mm con núcleo de resina. Ideal para trabajos de microsoldadura.', reviews:genReviews(7,2)},
+      {sku:'INS-006', name:'Mica de privacidad 5D', cat:'insumos', subcat:'glass', price:65, stock:22, desc:'Mica de privacidad con filtro anti-espía, bordes curvos 5D y dureza 9H. Evita que otros vean tu pantalla desde los lados.', reviews:genReviews(8,2)},
+      {sku:'CAM-001', name:'Cámara trasera iPhone 11', cat:'camaras', subcat:null, price:480, stock:5, desc:'Módulo de cámara trasera dual compatible con iPhone 11. Incluye lente y sensor, calidad de imagen igual al original.', reviews:genReviews(9,3)},
+    ],
+    customers: [
+      {id:'C-001', name:'José Martínez', phone:'55 1234 5678', notes:'Taller frecuente, paga cada quincena', since:'12/01/2026', balance:340},
+      {id:'C-002', name:'Talleres Ruiz S.A.', phone:'55 8765 4321', notes:'Compra al mayoreo', since:'03/03/2026', balance:0},
+      {id:'C-003', name:'Karen Sánchez', phone:'56 2211 9080', notes:'', since:'20/05/2026', balance:120},
+      {id:'C-004', name:'Miguel Ángel Torres', phone:'55 3344 2210', notes:'', since:'02/06/2026', balance:0},
+      {id:'C-005', name:'CelExpress Reparaciones', phone:'55 9081 7766', notes:'Mayoreo, recoge los viernes', since:'18/07/2026', balance:275},
+    ],
+    sales: [
+      {id:'V-1001', items:[{sku:'PANT-001', name:'Pantalla iPhone 11 OLED', qty:1, price:890}], subtotal:890, iva:0, total:890, cash:0, change:0, time:'10:12', ts:Date.parse('2026-09-18T10:12:00'), customerId:'C-001', method:'credito', tipo:'venta', cancelled:false},
+      {id:'V-1002', items:[{sku:'BAT-002', name:'Batería Samsung A21s', qty:1, price:290}], subtotal:290, iva:0, total:290, cash:0, change:0, time:'09:40', ts:Date.parse('2026-09-18T09:40:00'), customerId:'C-003', method:'credito', tipo:'venta', cancelled:false},
+      {id:'V-1003', items:[{sku:'TAB-001', name:'Tableta de carga iPhone 12', qty:1, price:180}], subtotal:180, iva:0, total:180, cash:0, change:0, time:'16:20', ts:Date.parse('2026-09-17T16:20:00'), customerId:'C-001', method:'efectivo', tipo:'venta', cancelled:false},
+      {id:'V-1004', items:[{sku:'TAP-001', name:'Tapa trasera iPhone 12 Pro', qty:1, price:220}], subtotal:220, iva:0, total:220, cash:0, change:0, time:'12:05', ts:Date.parse('2026-09-17T12:05:00'), customerId:'C-004', method:'efectivo', tipo:'venta', cancelled:false},
+      {id:'V-1005', items:[{sku:'FLEX-001', name:'Flexor de encendido iPhone X', qty:1, price:120},{sku:'INS-001', name:'Pegamento OCA UV 50ml', qty:1, price:95}], subtotal:215, iva:0, total:215, cash:0, change:0, time:'13:45', ts:Date.parse('2026-09-16T13:45:00'), customerId:'C-005', method:'credito', tipo:'venta', cancelled:false},
+    ],
+    repairs: [
+      {id:'EQ-001', order:'OR-1001', customer:'José Martínez', customerId:'C-001', brand:'Apple', model:'iPhone 11', device:'Apple iPhone 11', details:'—', work:'Cambio de pantalla OLED', accessories:'Ninguno', pass:'Sin contraseña', received:'02/09/2026', status:'Entregado', type:'reparacion', cost:990, charged:true},
+      {id:'EQ-002', order:'OR-1002', customer:'Karen Sánchez', customerId:'C-003', brand:'Samsung', model:'A32', device:'Samsung A32', details:'—', work:'Cambio de batería', accessories:'Ninguno', pass:'Sin contraseña', received:'28/08/2026', status:'Entregado', type:'reparacion', cost:390, charged:true},
+      {id:'EQ-003', order:'OR-1003', customer:'CelExpress Reparaciones', customerId:'C-005', brand:'Apple', model:'iPhone X', device:'Apple iPhone X', details:'—', work:'Reparación de flexor de encendido', accessories:'Ninguno', pass:'Sin contraseña', received:'25/08/2026', status:'Entregado', type:'reparacion', cost:220, charged:true},
+      {id:'EQ-004', order:'OR-1004', customer:'Miguel Ángel Torres', customerId:'C-004', brand:'Xiaomi', model:'Redmi 9', device:'Xiaomi Redmi 9', details:'—', work:'Cambio de contratapa', accessories:'Ninguno', pass:'Sin contraseña', received:'20/08/2026', status:'Entregado', type:'reparacion', cost:220, charged:true},
+      {id:'EQ-005', order:'OR-1005', customer:'Talleres Ruiz S.A.', customerId:'C-002', brand:'Apple', model:'iPhone 12 Pro', device:'Apple iPhone 12 Pro', details:'—', work:'Cambio de cámara trasera', accessories:'Ninguno', pass:'Sin contraseña', received:'15/08/2026', status:'Entregado', type:'reparacion', cost:580, charged:true},
+      {id:'EQ-006', order:'OR-1006', customer:'José Martínez', customerId:'C-001', brand:'Samsung', model:'S10', device:'Samsung S10', details:'—', work:'Cambio de flexor de volumen', accessories:'Ninguno', pass:'Sin contraseña', received:'10/08/2026', status:'Entregado', type:'reparacion', cost:230, charged:true},
+      {id:'EQ-007', order:'OR-1007', customer:'Karen Sánchez', customerId:'C-003', brand:'Apple', model:'iPhone 13', device:'Apple iPhone 13', details:'—', work:'Instalación de mica de cristal templado', accessories:'Ninguno', pass:'Sin contraseña', received:'05/09/2026', status:'Entregado', type:'glass', cost:45, charged:true},
+      {id:'EQ-008', order:'OR-1008', customer:'Miguel Ángel Torres', customerId:'C-004', brand:'Samsung', model:'A54', device:'Samsung A54', details:'—', work:'Cambio de mica de privacidad 5D', accessories:'Ninguno', pass:'Sin contraseña', received:'30/08/2026', status:'Entregado', type:'glass', cost:65, charged:true},
+      {id:'EQ-009', order:'OR-1009', customer:'Talleres Ruiz S.A.', customerId:'C-002', brand:'Apple', model:'iPhone 12', device:'Apple iPhone 12', details:'—', work:'Formateo y actualización de sistema', accessories:'Ninguno', pass:'Sin contraseña', received:'22/08/2026', status:'Entregado', type:'software', cost:150, charged:true},
+      {id:'EQ-010', order:'OR-1010', customer:'CelExpress Reparaciones', customerId:'C-005', brand:'Xiaomi', model:'Redmi Note 10', device:'Xiaomi Redmi Note 10', details:'—', work:'Eliminación de virus y optimización', accessories:'Ninguno', pass:'Sin contraseña', received:'18/08/2026', status:'Entregado', type:'software', cost:180, charged:true},
+      {id:'EQ-011', order:'OR-1011', customer:'José Martínez', customerId:'C-001', brand:'Apple', model:'iPhone 11', device:'Apple iPhone 11', details:'Cristal trasero trizado, enciende normal', work:'Cambio de pantalla', accessories:'Ninguno', pass:'1234', received:'09/09/2026', status:'En reparación', type:'reparacion', cost:0, charged:false},
+      {id:'EQ-012', order:'OR-1012', customer:'Karen Sánchez', customerId:'C-003', brand:'Samsung', model:'A32', device:'Samsung A32', details:'No carga desde ayer', work:'Diagnóstico y cambio de tableta de carga', accessories:'Cargador', pass:'Sin contraseña', received:'10/09/2026', status:'Recibido', type:'reparacion', cost:0, charged:false},
+    ],
+    users: [
+      {name:'Dueño', username:'dueno', password:'dueno123', role:'dueno'},
+      {name:'Karla Méndez', username:'vendedor', password:'vendedor123', role:'vendedor'},
+      {name:'Luis Fernández', username:'admin', password:'admin123', role:'administrador'},
+    ],
+    counters: {sale:1005, client:5, repair:12, order:1012},
+    caja: {abierta:false, montoInicial:0, aperturaHora:null, aperturaTs:null, cortes:[]},
+  };
+}
+
+function saveRaw(db){
+  try{ localStorage.setItem(DB_KEY, JSON.stringify(db)); }catch(e){}
+}
+function loadDB(){
+  let raw = null;
+  try{ raw = localStorage.getItem(DB_KEY); }catch(e){ raw = null; }
+  let db = null;
+  if(raw){ try{ db = JSON.parse(raw); }catch(e){ db = null; } }
+  if(!db || typeof db!=='object' || db.version!==DB_VERSION || !Array.isArray(db.products)) db = seedDB();
+  const base = seedDB();
+  ['products','customers','sales','repairs','users'].forEach(k=>{ if(!Array.isArray(db[k])) db[k] = base[k]; });
+  if(!db.counters || typeof db.counters!=='object') db.counters = base.counters;
+  ['sale','client','repair','order'].forEach(k=>{ if(typeof db.counters[k]!=='number') db.counters[k] = base.counters[k]; });
+  if(!db.caja || typeof db.caja!=='object') db.caja = base.caja;
+  if(!Array.isArray(db.caja.cortes)) db.caja.cortes = [];
+  db.version = DB_VERSION;
+  saveRaw(db);
+  return db;
+}
+
+const DB = loadDB();
+let products = DB.products;
+let customers = DB.customers;
+let sales = DB.sales;
+let repairs = DB.repairs;
+let users = DB.users;
+let counters = DB.counters;
+let caja = DB.caja;
+
+function snapshotDB(){
+  return {version:DB_VERSION, products, customers, sales, repairs, users, counters, caja};
+}
+function saveDB(){ saveRaw(snapshotDB()); }
+
+window.RefacTelDB = {
+  KEY: DB_KEY,
+  read(){ try{ return JSON.parse(localStorage.getItem(DB_KEY)); }catch(e){ return null; } },
+  save(){ saveDB(); },
+  reset(){ saveRaw(seedDB()); location.reload(); }
+};
+
+const methodLabel = m => ({efectivo:'Efectivo', tarjeta:'Pago con tarjeta', transferencia:'Transferencia', credito:'Crédito (fiado)', online:'Pedido en línea'}[m] || m);
+
+/* ============================================================
    DATA (misma cartera y catálogo que el panel interno, en modo solo lectura para el cliente)
 ============================================================ */
 const CATS = [
