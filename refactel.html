@@ -810,6 +810,13 @@ function snapshotDB(){
   return {version:DB_VERSION, products, customers, sales, repairs, users, counters, caja};
 }
 function saveDB(){ saveRaw(snapshotDB()); }
+/* Re-lee el store al navegar entre vistas: evita que un snapshot viejo pise
+   lo que la otra app haya escrito mientras tanto (ver Assumptions §6.2). */
+function reloadFromStore(){
+  const fresh = loadDB();
+  products = fresh.products; customers = fresh.customers; sales = fresh.sales;
+  repairs = fresh.repairs; users = fresh.users; counters = fresh.counters; caja = fresh.caja;
+}
 
 window.RefacTelDB = {
   KEY: DB_KEY,
@@ -863,6 +870,8 @@ document.querySelectorAll('#tabNav button').forEach(btn=>{
 });
 function switchView(v){
   if(v==='usuarios' && currentRole!=='dueno') return;
+  reloadFromStore();
+  updateCajaButton();
   currentView = v;
   document.querySelectorAll('#tabNav button').forEach(b=>b.classList.toggle('active', b.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.add('hidden'));
@@ -1162,6 +1171,7 @@ function showReceipt(sale){
 let activePosSub = 'venta';
 document.querySelectorAll('#posSubNav .chip').forEach(chip=>{
   chip.addEventListener('click', ()=>{
+    reloadFromStore();
     activePosSub = chip.dataset.sub;
     document.querySelectorAll('#posSubNav .chip').forEach(c=>c.classList.toggle('active', c===chip));
     document.getElementById('posSubVenta').classList.toggle('hidden', activePosSub!=='venta');
@@ -1374,6 +1384,7 @@ document.getElementById('rqAddBtn').addEventListener('click', ()=>{
 let activeInvSub = 'agregar';
 document.querySelectorAll('#invSubNav .chip').forEach(chip=>{
   chip.addEventListener('click', ()=>{
+    reloadFromStore();
     activeInvSub = chip.dataset.sub;
     document.querySelectorAll('#invSubNav .chip').forEach(c=>c.classList.toggle('active', c===chip));
     document.getElementById('invSubAgregar').classList.toggle('hidden', activeInvSub!=='agregar');

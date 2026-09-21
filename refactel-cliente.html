@@ -414,6 +414,13 @@ function snapshotDB(){
   return {version:DB_VERSION, products, customers, sales, repairs, users, counters, caja};
 }
 function saveDB(){ saveRaw(snapshotDB()); }
+/* Re-lee el store al navegar entre vistas: evita que un snapshot viejo pise
+   lo que la otra app haya escrito mientras tanto (ver Assumptions §6.2). */
+function reloadFromStore(){
+  const fresh = loadDB();
+  products = fresh.products; customers = fresh.customers; sales = fresh.sales;
+  repairs = fresh.repairs; users = fresh.users; counters = fresh.counters; caja = fresh.caja;
+}
 
 window.RefacTelDB = {
   KEY: DB_KEY,
@@ -521,6 +528,8 @@ document.getElementById('pdBack').addEventListener('click', e=>{
   switchView('tienda', document.querySelector('#tabNav button[data-view="tienda"]'));
 });
 function switchView(v, activeBtn){
+  reloadFromStore();
+  if(loggedInCustomer) loggedInCustomer = customers.find(c=>c.id===loggedInCustomer.id) || loggedInCustomer;
   document.querySelectorAll('#tabNav button').forEach(b=>b.classList.toggle('active', b===activeBtn));
   document.querySelectorAll('.view').forEach(s=>s.classList.add('hidden'));
   document.getElementById('view-'+v).classList.remove('hidden');
