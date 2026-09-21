@@ -432,6 +432,7 @@ table.inv tr:hover td{background:var(--surface);}
           </div>
           <div class="field"><label>Precio (MXN)</label><input type="number" id="fPrice" placeholder="0.00"></div>
           <div class="field"><label>Stock inicial</label><input type="number" id="fStock" placeholder="0"></div>
+          <div class="field wide" style="grid-column:1/-1;"><label>Descripción (opcional, se muestra en la tienda)</label><input type="text" id="fDesc" placeholder="Ej. Pantalla OLED compatible, incluye digitalizador"></div>
         </div>
         <div style="display:flex;gap:10px;margin-top:16px;">
           <button class="btn btn-primary" id="saveProduct">Guardar producto</button>
@@ -595,6 +596,7 @@ table.inv tr:hover td{background:var(--surface);}
       </div>
       <div class="field"><label>Precio (MXN)</label><input type="number" id="ePrice"></div>
       <div class="field"><label>Stock</label><input type="number" id="eStock"></div>
+      <div class="field wide" style="grid-column:1/-1;"><label>Descripción (se muestra en la tienda)</label><input type="text" id="eDesc"></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px;">
       <button class="btn btn-primary" id="saveEditBtn" style="flex:1;">Guardar cambios</button>
@@ -937,6 +939,7 @@ function renderUsersList(){
   body.querySelectorAll('[data-deluser]').forEach(b=>b.addEventListener('click', ()=>{
     if(confirm('¿Eliminar esta cuenta?')){
       users = users.filter(u=>u.username!==b.dataset.deluser);
+      saveDB();
       renderUsersList(); renderPanelUsers();
     }
   }));
@@ -960,6 +963,7 @@ document.getElementById('saveUserBtn').addEventListener('click', ()=>{
   if(!name || !username || !password){ alert('Completa todos los campos.'); return; }
   if(users.some(u=>u.username.toLowerCase()===username.toLowerCase())){ alert('Ya existe una cuenta con ese usuario.'); return; }
   users.push({name, username, password, role});
+  saveDB();
   ['uName','uUsername','uPassword'].forEach(id=>document.getElementById(id).value='');
   renderUsersList();
   alert('Cuenta creada correctamente.');
@@ -1407,6 +1411,7 @@ function renderInvTable(tbodyId, mode){
     body.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
       if(confirm('¿Eliminar este producto del inventario?')){
         products = products.filter(p=>p.sku!==b.dataset.del);
+        saveDB();
         renderInventory(); renderGrid(); renderPosTiles();
       }
     }));
@@ -1418,10 +1423,12 @@ document.getElementById('saveProduct').addEventListener('click', ()=>{
   const cat = document.getElementById('fCat').value;
   const price = parseFloat(document.getElementById('fPrice').value);
   const stock = parseInt(document.getElementById('fStock').value);
+  const desc = document.getElementById('fDesc').value.trim();
   if(!name || !sku || isNaN(price) || isNaN(stock)){ alert('Completa todos los campos correctamente.'); return; }
   if(products.some(p=>p.sku.toLowerCase()===sku.toLowerCase())){ alert('Ya existe un producto con ese SKU.'); return; }
-  products.push({sku, name, cat, price, stock});
-  ['fName','fSku','fPrice','fStock'].forEach(id=>document.getElementById(id).value='');
+  products.push({sku, name, cat, subcat:null, price, stock, desc, reviews:[]});
+  saveDB();
+  ['fName','fSku','fPrice','fStock','fDesc'].forEach(id=>document.getElementById(id).value='');
   alert('Producto agregado correctamente.');
   renderInventory(); renderGrid(); renderPosTiles(); renderChips();
 });
@@ -1437,6 +1444,7 @@ function openEditModal(sku){
   document.getElementById('eCat').value = p.cat;
   document.getElementById('ePrice').value = p.price;
   document.getElementById('eStock').value = p.stock;
+  document.getElementById('eDesc').value = p.desc || '';
   document.getElementById('editModal').classList.add('show');
 }
 document.getElementById('closeEditModal').addEventListener('click', ()=>document.getElementById('editModal').classList.remove('show'));
@@ -1449,9 +1457,14 @@ document.getElementById('saveEditBtn').addEventListener('click', ()=>{
   const cat = document.getElementById('eCat').value;
   const price = parseFloat(document.getElementById('ePrice').value);
   const stock = parseInt(document.getElementById('eStock').value);
+  const desc = document.getElementById('eDesc').value.trim();
   if(!name || !sku || isNaN(price) || isNaN(stock)){ alert('Completa todos los campos correctamente.'); return; }
   if(sku.toLowerCase()!==p.sku.toLowerCase() && products.some(x=>x.sku.toLowerCase()===sku.toLowerCase())){ alert('Ya existe otro producto con ese SKU.'); return; }
-  p.name = name; p.sku = sku; p.cat = cat; p.price = price; p.stock = stock;
+  // se conservan subcat y reviews del producto (los usa la tienda)
+  p.name = name; p.sku = sku; p.cat = cat; p.price = price; p.stock = stock; p.desc = desc;
+  if(p.subcat===undefined) p.subcat = null;
+  if(!Array.isArray(p.reviews)) p.reviews = [];
+  saveDB();
   document.getElementById('editModal').classList.remove('show');
   renderInventory(); renderGrid(); renderPosTiles(); renderChips();
 });
@@ -1506,8 +1519,9 @@ document.getElementById('saveClient').addEventListener('click', ()=>{
   if(!name){ alert('El nombre del cliente es obligatorio.'); return; }
   counters.client++;
   const id = 'C-' + String(counters.client).padStart(3,'0');
-  const since = new Date().toLocaleDateString('es-MX');
+  const since = fechaLocal();
   customers.push({id, name, phone, notes, since, balance:0});
+  saveDB();
   ['cName','cPhone','cNotes'].forEach(fid=>document.getElementById(fid).value='');
   document.getElementById('addClientForm').style.display = 'none';
   renderClientes();
@@ -1546,6 +1560,7 @@ document.getElementById('abonoBtn').addEventListener('click', ()=>{
   const amount = parseFloat(document.getElementById('abonoInput').value);
   if(isNaN(amount) || amount<=0){ alert('Ingresa un monto válido a abonar.'); return; }
   c.balance = Math.max(0, c.balance - amount);
+  saveDB();
   openClientModal(c.id);
   renderClientes();
 });
@@ -1583,7 +1598,10 @@ function updateCajaButton(){
   label.textContent = caja.abierta ? 'Cerrar caja' : 'Abrir caja';
 }
 function montoPorMetodo(tipo, metodo){
-  return sales.filter(s=>s.method===metodo && !s.cancelled && s.tipo===tipo).reduce((a,s)=>a+s.total,0);
+  // solo las ventas del turno abierto (ts >= apertura); sin caja abierta no hay nada que cortar
+  const desde = caja.aperturaTs;
+  if(desde==null) return 0;
+  return sales.filter(s=>s.method===metodo && !s.cancelled && s.tipo===tipo && s.ts>=desde).reduce((a,s)=>a+s.total,0);
 }
 function efectivoPorTipo(tipo){
   return montoPorMetodo(tipo, 'efectivo');
@@ -1666,7 +1684,9 @@ document.getElementById('cajaAbrirBtn').addEventListener('click', ()=>{
   caja.abierta = true;
   caja.montoInicial = monto;
   caja.aperturaHora = new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'});
+  caja.aperturaTs = Date.now();
   caja.cortes = [];
+  saveDB();
   updateCajaButton();
   document.getElementById('cajaModal').classList.remove('show');
 });
@@ -1679,6 +1699,7 @@ document.getElementById('cajaVentaParcialBtn').addEventListener('click', ()=>{
   const contadoRaw = document.getElementById('cajaVentaConteo').value;
   const contado = contadoRaw==='' ? null : parseFloat(contadoRaw);
   caja.cortes.push({categoria:'venta', tipo:'Corte parcial', hora:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}), efectivo, tarjeta, transferencia, totalCorte, esperado, contado});
+  saveDB();
   alert('Corte parcial de Ventas y refacciones registrado.\nEfectivo: '+fmt(efectivo)+' · Tarjeta: '+fmt(tarjeta)+' · Transferencia: '+fmt(transferencia)+'\nTotal del corte: '+fmt(totalCorte)+(contado!=null?' · Diferencia de efectivo: '+fmt(contado-esperado):'')+'.\nLa caja sigue abierta.');
   refreshCajaCortePanel();
 });
@@ -1691,6 +1712,7 @@ document.getElementById('cajaRepParcialBtn').addEventListener('click', ()=>{
   const contadoRaw = document.getElementById('cajaRepConteo').value;
   const contado = contadoRaw==='' ? null : parseFloat(contadoRaw);
   caja.cortes.push({categoria:'reparacion', tipo:'Corte parcial', hora:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}), efectivo, tarjeta, transferencia, totalCorte, esperado, contado});
+  saveDB();
   alert('Corte parcial de Reparaciones registrado.\nEfectivo: '+fmt(efectivo)+' · Tarjeta: '+fmt(tarjeta)+' · Transferencia: '+fmt(transferencia)+'\nTotal del corte: '+fmt(totalCorte)+(contado!=null?' · Diferencia de efectivo: '+fmt(contado-esperado):'')+'.\nLa caja sigue abierta.');
   refreshCajaCortePanel();
 });
@@ -1717,6 +1739,8 @@ document.getElementById('cajaFinalBtn').addEventListener('click', ()=>{
   caja.abierta = false;
   caja.montoInicial = 0;
   caja.aperturaHora = null;
+  caja.aperturaTs = null;
+  saveDB();
   updateCajaButton();
   document.getElementById('cajaModal').classList.remove('show');
   alert('Corte final registrado y caja cerrada.\n\nVentas y refacciones — Efvo: '+fmt(vEfectivo)+' · Tarjeta: '+fmt(vTarjeta)+' · Transf: '+fmt(vTransferencia)+' · Total: '+fmt(vTotalCorte)+(ventaContado!=null?' · dif efvo: '+fmt(ventaContado-ventaEsperado):'')+
