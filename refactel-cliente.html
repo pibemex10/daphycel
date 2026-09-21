@@ -437,76 +437,8 @@ const CATS = [
   {id:'insumos', label:'Insumos'},
   {id:'camaras', label:'Cámaras'},
 ];
-const REVIEW_POOL = [
-  {author:'Ricardo M.', rating:5, comment:'Llegó rápido y quedó perfecta, se ve como original.'},
-  {author:'Daniela G.', rating:4, comment:'Buena calidad, un poco cara pero cumple muy bien.'},
-  {author:'Andrés P.', rating:5, comment:'Excelente, la instalé yo mismo sin problema.'},
-  {author:'Fernanda L.', rating:5, comment:'Superó mis expectativas, muy recomendable.'},
-  {author:'Jorge T.', rating:4, comment:'Todo bien, tardó un par de días extra en llegar.'},
-  {author:'Sofía R.', rating:5, comment:'Excelente atención y producto tal cual se describe.'},
-  {author:'Marco A.', rating:3, comment:'Funciona bien pero el empaque llegó algo golpeado.'},
-  {author:'Paola V.', rating:5, comment:'Muy buena refacción, duró mucho más que la anterior.'},
-  {author:'Iván C.', rating:4, comment:'Cumple lo que promete, buen precio comparado con otras tiendas.'},
-  {author:'Renata S.', rating:5, comment:'La compré para mi taller, excelente calidad y garantía.'},
-];
-const REVIEW_DATES = ['hace 2 días','hace 5 días','hace 1 semana','hace 2 semanas','hace 3 semanas','hace 1 mes'];
-function genReviews(seed, count){
-  const out = [];
-  for(let i=0;i<count;i++){
-    const r = REVIEW_POOL[(seed+i*3)%REVIEW_POOL.length];
-    out.push({...r, date: REVIEW_DATES[(seed+i)%REVIEW_DATES.length]});
-  }
-  return out;
-}
-let products = [
-  {sku:'PANT-001', name:'Pantalla iPhone 11 OLED', cat:'pantallas', price:890, stock:14, desc:'Pantalla OLED de reemplazo compatible con iPhone 11, incluye digitalizador (touch). Alto brillo y color fiel al original, con protección contra rayones. Incluye herramientas básicas de instalación.', reviews:genReviews(0,3)},
-  {sku:'PANT-002', name:'Pantalla Samsung A32', cat:'pantallas', price:650, stock:9, desc:'Pantalla AMOLED de reemplazo para Samsung Galaxy A32, con marco incluido. Instalación sencilla y compatibilidad total con sensores originales.', reviews:genReviews(1,2)},
-  {sku:'PANT-003', name:'Pantalla iPhone 8', cat:'pantallas', price:420, stock:3, desc:'Pantalla LCD de reemplazo para iPhone 8, calidad grado A+. Ideal para talleres de reparación que buscan buena relación calidad-precio.', reviews:genReviews(2,2)},
-  {sku:'TAB-001', name:'Tableta de carga iPhone 12', cat:'tabletas', price:180, stock:20, desc:'Módulo de carga (dock connector) original compatible con iPhone 12. Incluye micrófono integrado y conector Lightning de alta durabilidad.', reviews:genReviews(3,2)},
-  {sku:'TAB-002', name:'Tableta de carga USB-C genérica', cat:'tabletas', price:95, stock:35, desc:'Módulo de carga USB-C universal, compatible con múltiples modelos Android. Fabricado con contactos reforzados para mayor vida útil.', reviews:genReviews(4,2)},
-  {sku:'FLEX-001', name:'Flexor de encendido iPhone X', cat:'flexores', price:120, stock:12, desc:'Cable flexor de botón de encendido/apagado para iPhone X. Fácil instalación, compatible 100% con el conector original.', reviews:genReviews(5,2)},
-  {sku:'FLEX-002', name:'Flexor de volumen Samsung S10', cat:'flexores', price:110, stock:8, desc:'Flexor de botones de volumen para Samsung Galaxy S10. Incluye contactos dorados anticorrosión.', reviews:genReviews(6,1)},
-  {sku:'BAT-001', name:'Batería iPhone 11', cat:'baterias', price:340, stock:6, desc:'Batería de reemplazo de alta capacidad para iPhone 11 (3110 mAh). Incluye chip de calibración para lectura correcta de porcentaje y salud de batería.', reviews:genReviews(7,3)},
-  {sku:'BAT-002', name:'Batería Samsung A21s', cat:'baterias', price:290, stock:2, desc:'Batería de reemplazo para Samsung A21s, capacidad original de fábrica. Certificada contra sobrecarga y cortocircuito.', reviews:genReviews(8,2)},
-  {sku:'TAP-001', name:'Tapa trasera iPhone 12 Pro', cat:'tapas', price:220, stock:11, desc:'Tapa trasera de cristal para iPhone 12 Pro, con orificio para cámara y logo. Acabado idéntico al original.', reviews:genReviews(9,2)},
-  {sku:'TAP-002', name:'Contratapa Xiaomi Redmi 9', cat:'tapas', price:150, stock:15, desc:'Contratapa trasera para Xiaomi Redmi 9, incluye botones laterales preinstalados. Varios colores disponibles bajo pedido.', reviews:genReviews(0,2)},
-  {sku:'HER-001', name:'Kit de destornilladores precisión', cat:'herramientas', price:180, stock:25, desc:'Kit de 24 piezas para reparación de celulares: desarmadores de precisión, espátulas, ventosa y palancas plásticas antiestática.', reviews:genReviews(1,3)},
-  {sku:'HER-002', name:'Estación de calor SMD', cat:'herramientas', price:1250, stock:4, desc:'Estación de aire caliente profesional para desoldado SMD, control digital de temperatura y flujo de aire. Ideal para reballing y microsoldadura.', reviews:genReviews(2,2)},
-  {sku:'INS-001', name:'Pegamento OCA UV 50ml', cat:'insumos', subcat:'liquidos', price:95, stock:30, desc:'Adhesivo líquido OCA de curado UV para laminado de pantallas. Transparencia óptica total, sin burbujas al curar.', reviews:genReviews(3,2)},
-  {sku:'INS-002', name:'Rollo de cinta 3M doble cara', cat:'insumos', subcat:'otros', price:60, stock:40, desc:'Cinta adhesiva de doble cara 3M para sellado de tapas traseras y fijación de componentes. Alta adherencia y resistencia al calor.', reviews:genReviews(4,1)},
-  {sku:'INS-003', name:'Mica de cristal templado universal', cat:'insumos', subcat:'glass', price:45, stock:60, desc:'Mica de cristal templado 9H, alta transparencia y oleofóbica anti-huella. Kit de instalación incluido.', reviews:genReviews(5,3)},
-  {sku:'INS-004', name:'Alcohol isopropílico 100ml', cat:'insumos', subcat:'liquidos', price:70, stock:25, desc:'Alcohol isopropílico al 99.9% para limpieza de componentes electrónicos antes de reparación. Evapora sin dejar residuo.', reviews:genReviews(6,2)},
-  {sku:'INS-005', name:'Hilo de soldar 0.6mm', cat:'insumos', subcat:'hilos', price:55, stock:18, desc:'Hilo de estaño para soldadura de precisión, diámetro 0.6mm con núcleo de resina. Ideal para trabajos de microsoldadura.', reviews:genReviews(7,2)},
-  {sku:'INS-006', name:'Mica de privacidad 5D', cat:'insumos', subcat:'glass', price:65, stock:22, desc:'Mica de privacidad con filtro anti-espía, bordes curvos 5D y dureza 9H. Evita que otros vean tu pantalla desde los lados.', reviews:genReviews(8,2)},
-  {sku:'CAM-001', name:'Cámara trasera iPhone 11', cat:'camaras', price:480, stock:5, desc:'Módulo de cámara trasera dual compatible con iPhone 11. Incluye lente y sensor, calidad de imagen igual al original.', reviews:genReviews(9,3)},
-];
-let customers = [
-  {id:'C-001', name:'José Martínez', phone:'55 1234 5678', since:'12/01/2026', balance:340},
-  {id:'C-002', name:'Talleres Ruiz S.A.', phone:'55 8765 4321', since:'03/03/2026', balance:0},
-  {id:'C-003', name:'Karen Sánchez', phone:'56 2211 9080', since:'20/05/2026', balance:120},
-  {id:'C-004', name:'Miguel Ángel Torres', phone:'55 3344 2210', since:'02/06/2026', balance:0},
-  {id:'C-005', name:'CelExpress Reparaciones', phone:'55 9081 7766', since:'18/07/2026', balance:275},
-];
-let sales = [
-  {id:'V-1001', customerId:'C-001', method:'credito', total:340, time:'10:12', items:[{name:'Pantalla iPhone 11 OLED', qty:1, price:890}]},
-  {id:'V-1002', customerId:'C-003', method:'credito', total:120, time:'09:40', items:[{name:'Batería Samsung A21s', qty:1, price:290}]},
-  {id:'V-1003', customerId:'C-001', method:'efectivo', total:180, time:'ayer 16:20', items:[{name:'Tableta de carga iPhone 12', qty:1, price:180}]},
-  {id:'V-1004', customerId:'C-004', method:'efectivo', total:220, time:'ayer 12:05', items:[{name:'Tapa trasera iPhone 12 Pro', qty:1, price:220}]},
-  {id:'V-1005', customerId:'C-005', method:'credito', total:275, time:'hace 2 días', items:[{name:'Flexor de encendido iPhone X', qty:1, price:120},{name:'Pegamento OCA UV 50ml', qty:1, price:95}]},
-];
-
-let jobs = [
-  {order:'OR-1001', device:'iPhone 11', issue:'Cambio de pantalla OLED', customer:'José Martínez', date:'02/09/2026', cost:990, status:'Entregado', type:'reparacion'},
-  {order:'OR-1002', device:'Samsung A32', issue:'Cambio de batería', customer:'Karen Sánchez', date:'28/08/2026', cost:390, status:'Entregado', type:'reparacion'},
-  {order:'OR-1003', device:'iPhone X', issue:'Reparación de flexor de encendido', customer:'CelExpress Reparaciones', date:'25/08/2026', cost:220, status:'Entregado', type:'reparacion'},
-  {order:'OR-1004', device:'Xiaomi Redmi 9', issue:'Cambio de contratapa', customer:'Miguel Ángel Torres', date:'20/08/2026', cost:220, status:'Entregado', type:'reparacion'},
-  {order:'OR-1005', device:'iPhone 12 Pro', issue:'Cambio de cámara trasera', customer:'Talleres Ruiz S.A.', date:'15/08/2026', cost:580, status:'Entregado', type:'reparacion'},
-  {order:'OR-1006', device:'Samsung S10', issue:'Cambio de flexor de volumen', customer:'José Martínez', date:'10/08/2026', cost:230, status:'Entregado', type:'reparacion'},
-  {order:'OR-1007', device:'iPhone 13', issue:'Instalación de mica de cristal templado', customer:'Karen Sánchez', date:'05/09/2026', cost:45, status:'Entregado', type:'glass'},
-  {order:'OR-1008', device:'Samsung A54', issue:'Cambio de mica de privacidad 5D', customer:'Miguel Ángel Torres', date:'30/08/2026', cost:65, status:'Entregado', type:'glass'},
-  {order:'OR-1009', device:'iPhone 12', issue:'Formateo y actualización de sistema', customer:'Talleres Ruiz S.A.', date:'22/08/2026', cost:150, status:'Entregado', type:'software'},
-  {order:'OR-1010', device:'Xiaomi Redmi Note 10', issue:'Eliminación de virus y optimización', customer:'CelExpress Reparaciones', date:'18/08/2026', cost:180, status:'Entregado', type:'software'},
-];
+/* products, customers, sales y repairs se hidratan desde el store compartido
+   (ver bloque PERSISTENCIA arriba). */
 const TRABAJOS_SUBMENU = [
   {id:'glass', label:'GLASS'},
   {id:'software', label:'SOFTWARE'},
@@ -705,6 +637,7 @@ document.getElementById('revSubmit').addEventListener('click', ()=>{
   if(!author || !comment || selectedStars===0){ alert('Completa tu nombre, calificación y comentario.'); return; }
   if(!p.reviews) p.reviews = [];
   p.reviews.unshift({author, rating:selectedStars, comment, date:'justo ahora'});
+  saveDB();
   renderProductReviews(p);
   document.getElementById('pdStars').textContent = starString(avgRating(p));
   document.getElementById('pdRatingCount').textContent = avgRating(p).toFixed(1)+' · '+p.reviews.length+' opiniones';
@@ -723,14 +656,14 @@ function searchOrder(){
   const query = document.getElementById('orderSearchInput').value.trim();
   const grid = document.getElementById('jobsGrid');
   if(!query){ grid.innerHTML = '<div class="empty">Ingresa tu número de orden para ver el estado de tu reparación.</div>'; return; }
-  const job = jobs.find(j=>j.order.toLowerCase()===query.toLowerCase());
+  const job = repairs.find(r=>r.order && r.order.toLowerCase()===query.toLowerCase());
   if(!job){ grid.innerHTML = '<div class="empty">No encontramos ninguna orden con ese número. Verifica e intenta de nuevo.</div>'; return; }
   grid.innerHTML = `
     <div class="job-card">
       <span class="job-status">${job.status}</span>
       <div class="job-device">${job.device}</div>
-      <div class="job-issue">${job.issue}</div>
-      <div class="job-meta"><span class="mono">${job.order}</span><span class="mono">${job.date} · ${fmt(job.cost)}</span></div>
+      <div class="job-issue">${job.work}</div>
+      <div class="job-meta"><span class="mono">${job.order}</span><span class="mono">${job.received} · ${fmt(job.cost)}</span></div>
     </div>
   `;
 }
@@ -763,9 +696,34 @@ function renderCartDrawer(){
 function openCart(){ document.getElementById('cartDrawer').classList.add('show'); document.getElementById('overlay').classList.add('show'); }
 function closeCartFn(){ document.getElementById('cartDrawer').classList.remove('show'); document.getElementById('overlay').classList.remove('show'); }
 function checkoutOnline(){
-  if(Object.keys(cart).length===0) return;
-  alert('¡Pedido confirmado! Te avisaremos cuando esté listo para recoger o enviar.');
+  const entries = Object.entries(cart);
+  if(entries.length===0) return;
+  for(const [sku,qty] of entries){
+    const p = findProduct(sku);
+    if(!p || p.stock < qty){ alert('No hay suficiente stock de '+((p&&p.name)||sku)+'.'); return; }
+  }
+  let total = 0;
+  const items = entries.map(([sku,qty])=>{
+    const p = findProduct(sku);
+    total += p.price*qty;
+    return {sku, name:p.name, qty, price:p.price};
+  });
+  entries.forEach(([sku,qty])=>{ const p = findProduct(sku); p.stock = Math.max(0, p.stock-qty); });
+  const sale = {
+    id: 'V-'+(++counters.sale),
+    items,
+    subtotal: total, iva: 0, total, cash: 0, change: 0,
+    time: new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'}),
+    ts: Date.now(),
+    customerId: loggedInCustomer ? loggedInCustomer.id : null,
+    method: 'online', tipo:'venta', cancelled:false
+  };
+  sales.unshift(sale);
+  saveDB();
   cart={}; renderCartBadge(); renderCartDrawer(); closeCartFn();
+  renderGrid();
+  if(activeProductSku && !document.getElementById('view-producto').classList.contains('hidden')) openProductView(activeProductSku);
+  alert('¡Pedido confirmado! Folio '+sale.id+'. Te avisaremos cuando esté listo para recoger o enviar.');
 }
 
 /* ---------- mi cuenta (búsqueda privada) ---------- */
@@ -776,7 +734,7 @@ function findCustomerMatches(query){
   const byId = customers.find(c=>c.id.toLowerCase()===q);
   if(byId) return [byId];
   // 2) coincidencia por número de orden de reparación → cliente dueño de esa orden
-  const job = jobs.find(j=>j.order && j.order.toLowerCase()===q);
+  const job = repairs.find(r=>r.order && r.order.toLowerCase()===q);
   if(job){
     const byJobName = customers.find(c=>c.name.toLowerCase()===job.customer.toLowerCase());
     if(byJobName) return [byJobName];
@@ -824,7 +782,7 @@ function renderAccount(){
   box.innerHTML = hist.length===0
     ? '<div class="empty">Aún no tienes compras registradas.</div>'
     : hist.map(s=>`<div class="cd-history-item">
-        <span>${s.items.map(it=>it.qty+'× '+it.name).join(', ')}<br><span class="s-time">${s.id} · ${s.time} · ${s.method==='credito'?'Crédito':'Efectivo'}</span></span>
+        <span>${s.items.map(it=>it.qty+'× '+it.name).join(', ')}<br><span class="s-time">${s.id} · ${s.time} · ${methodLabel(s.method)}</span></span>
         <span class="mono">${fmt(s.total)}</span>
       </div>`).join('');
 }
