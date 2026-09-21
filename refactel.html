@@ -832,34 +832,9 @@ const CATS = [
   {id:'camaras', label:'Cámaras'},
 ];
 
-let products = [
-  {sku:'PANT-001', name:'Pantalla iPhone 11 OLED', cat:'pantallas', price:890, stock:14},
-  {sku:'PANT-002', name:'Pantalla Samsung A32', cat:'pantallas', price:650, stock:9},
-  {sku:'PANT-003', name:'Pantalla iPhone 8', cat:'pantallas', price:420, stock:3},
-  {sku:'TAB-001', name:'Tableta de carga iPhone 12', cat:'tabletas', price:180, stock:20},
-  {sku:'TAB-002', name:'Tableta de carga USB-C genérica', cat:'tabletas', price:95, stock:35},
-  {sku:'FLEX-001', name:'Flexor de encendido iPhone X', cat:'flexores', price:120, stock:12},
-  {sku:'FLEX-002', name:'Flexor de volumen Samsung S10', cat:'flexores', price:110, stock:8},
-  {sku:'BAT-001', name:'Batería iPhone 11', cat:'baterias', price:340, stock:6},
-  {sku:'BAT-002', name:'Batería Samsung A21s', cat:'baterias', price:290, stock:2},
-  {sku:'TAP-001', name:'Tapa trasera iPhone 12 Pro', cat:'tapas', price:220, stock:11},
-  {sku:'TAP-002', name:'Contratapa Xiaomi Redmi 9', cat:'tapas', price:150, stock:15},
-  {sku:'HER-001', name:'Kit de destornilladores precisión', cat:'herramientas', price:180, stock:25},
-  {sku:'HER-002', name:'Estación de calor SMD', cat:'herramientas', price:1250, stock:4},
-  {sku:'INS-001', name:'Pegamento OCA UV 50ml', cat:'insumos', price:95, stock:30},
-  {sku:'INS-002', name:'Rollo de cinta 3M doble cara', cat:'insumos', price:60, stock:40},
-  {sku:'CAM-001', name:'Cámara trasera iPhone 11', cat:'camaras', price:480, stock:5},
-];
+/* products, sales, customers, repairs, users, counters y caja se hidratan
+   desde el store compartido (ver bloque PERSISTENCIA arriba). */
 
-let sales = []; // {id, items:[{sku,name,qty,price}], subtotal, iva, total, cash, change, time, customerId, method}
-let saleCounter = 1000;
-
-let customers = [
-  {id:'C-001', name:'José Martínez', phone:'55 1234 5678', notes:'Taller frecuente, paga cada quincena', since:'12/01/2026', balance:340},
-  {id:'C-002', name:'Talleres Ruiz S.A.', phone:'55 8765 4321', notes:'Compra al mayoreo', since:'03/03/2026', balance:0},
-  {id:'C-003', name:'Karen Sánchez', phone:'56 2211 9080', notes:'', since:'20/05/2026', balance:120},
-];
-let clientCounter = 3;
 let activeClientId = null;
 let clientSearchTerm = '';
 
@@ -869,17 +844,11 @@ let clientSearchTerm = '';
 let currentView = 'tienda';
 let currentRole = null;
 let loggedInUser = null;
-let users = [
-  {name:'Dueño', username:'dueno', password:'dueno123', role:'dueno'},
-  {name:'Karla Méndez', username:'vendedor', password:'vendedor123', role:'vendedor'},
-  {name:'Luis Fernández', username:'admin', password:'admin123', role:'administrador'},
-];
 let activeCat = 'all';
 let searchTerm = '';
 let ticket = {}; // sku -> qty (POS ticket)
 
 const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
-const methodLabel = m => ({efectivo:'Efectivo', tarjeta:'Pago con tarjeta', transferencia:'Transferencia', credito:'Crédito (fiado)'}[m] || m);
 const catLabel = id => (CATS.find(c=>c.id===id)||{}).label || id;
 const findProduct = sku => products.find(p=>p.sku===sku);
 
@@ -1148,7 +1117,7 @@ function cobrar(){
   }
   entries.forEach(([sku,qty])=>{ const p = findProduct(sku); p.stock = Math.max(0, p.stock-qty); });
   const sale = {
-    id: 'V-'+(++saleCounter),
+    id: 'V-'+(++counters.sale),
     items: entries.map(([sku,qty])=>({sku, name:findProduct(sku).name, qty, price:findProduct(sku).price})),
     subtotal:t.subtotal, iva:t.iva, total:t.total, cash, change: method==='efectivo' ? cash-t.total : 0,
     time: new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'}),
@@ -1240,11 +1209,6 @@ function cancelSale(saleId){
 }
 
 /* ---------- equipos para reparar ---------- */
-let repairQueue = [
-  {id:'EQ-001', customer:'José Martínez', brand:'Apple', model:'iPhone 11', device:'Apple iPhone 11', details:'Cristal trasero trizado, enciende normal', work:'Cambio de pantalla', accessories:'Ninguno', pass:'1234', received:'09/09/2026', status:'En reparación'},
-  {id:'EQ-002', customer:'Karen Sánchez', brand:'Samsung', model:'A32', device:'Samsung A32', details:'No carga desde ayer', work:'Diagnóstico y cambio de tableta de carga', accessories:'Cargador', pass:'Sin contraseña', received:'10/09/2026', status:'Recibido'},
-];
-let repairCounter = 2;
 let deviceBlockCount = 0;
 const REPAIR_STATUSES = ['Recibido','En reparación','Listo para entrega','Entregado'];
 
@@ -1280,8 +1244,8 @@ document.getElementById('rqAddDeviceBlock').addEventListener('click', ()=>addDev
 
 function renderRepairQueue(){
   const body = document.getElementById('repairQueueBody');
-  if(repairQueue.length===0){ body.innerHTML = '<tr><td colspan="7" class="empty">No hay equipos registrados.</td></tr>'; return; }
-  body.innerHTML = repairQueue.map(r=>`
+  if(repairs.length===0){ body.innerHTML = '<tr><td colspan="7" class="empty">No hay equipos registrados.</td></tr>'; return; }
+  body.innerHTML = repairs.map(r=>`
     <tr>
       <td>${r.device}</td>
       <td>${r.customer}</td>
@@ -1297,7 +1261,7 @@ function renderRepairQueue(){
     </tr>
   `).join('');
   body.querySelectorAll('[data-status]').forEach(sel=>sel.addEventListener('change', ()=>{
-    const r = repairQueue.find(x=>x.id===sel.dataset.status);
+    const r = repairs.find(x=>x.id===sel.dataset.status);
     if(r) r.status = sel.value;
   }));
   body.querySelectorAll('[data-detail]').forEach(b=>b.addEventListener('click', ()=>openRepairDetail(b.dataset.detail)));
@@ -1305,7 +1269,7 @@ function renderRepairQueue(){
 }
 let chargingRepairId = null;
 function openRepairChargeModal(id){
-  const r = repairQueue.find(x=>x.id===id);
+  const r = repairs.find(x=>x.id===id);
   if(!r) return;
   chargingRepairId = id;
   document.getElementById('rcInfo').textContent = r.device+' · '+r.customer+' · '+r.work;
@@ -1316,14 +1280,14 @@ function openRepairChargeModal(id){
 document.getElementById('rcCancelBtn').addEventListener('click', ()=>document.getElementById('repairChargeModal').classList.remove('show'));
 document.getElementById('repairChargeModal').addEventListener('click', e=>{ if(e.target.id==='repairChargeModal') e.currentTarget.classList.remove('show'); });
 document.getElementById('rcConfirmBtn').addEventListener('click', ()=>{
-  const r = repairQueue.find(x=>x.id===chargingRepairId);
+  const r = repairs.find(x=>x.id===chargingRepairId);
   if(!r) return;
   const amount = parseFloat(document.getElementById('rcAmount').value);
   if(isNaN(amount) || amount<=0){ alert('Ingresa un monto válido.'); return; }
   const method = document.querySelector('input[name="rcMethod"]:checked').value;
-  saleCounter++;
+  counters.sale++;
   const sale = {
-    id: 'R-'+saleCounter,
+    id: 'R-'+counters.sale,
     items: [{name: r.device+' — '+r.work, qty:1, price:amount}],
     subtotal: amount, iva: 0, total: amount, cash: amount, change: 0,
     time: new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'}),
@@ -1338,7 +1302,7 @@ document.getElementById('rcConfirmBtn').addEventListener('click', ()=>{
   alert('Cobro de reparación registrado: '+fmt(amount)+' ('+methodLabel(method)+').');
 });
 function openRepairDetail(id){
-  const r = repairQueue.find(x=>x.id===id);
+  const r = repairs.find(x=>x.id===id);
   if(!r) return;
   document.getElementById('rdTitle').textContent = r.device;
   document.getElementById('rdCustomer').textContent = r.id+' · '+r.customer+' · Recibido '+r.received;
@@ -1365,9 +1329,9 @@ document.getElementById('rqAddBtn').addEventListener('click', ()=>{
     const accessories = block.querySelector('.dv-accesorios').value.trim();
     const pass = block.querySelector('.dv-pass').value.trim();
     if(!brand || !model || !work){ alert('Completa al menos Marca, Modelo y Trabajo a realizar en cada equipo.'); return; }
-    repairCounter++;
+    counters.repair++;
     newEntries.push({
-      id: 'EQ-'+String(repairCounter).padStart(3,'0'),
+      id: 'EQ-'+String(counters.repair).padStart(3,'0'),
       customer, brand, model, device: brand+' '+model,
       details, work,
       accessories: accessories || 'Ninguno',
@@ -1376,7 +1340,7 @@ document.getElementById('rqAddBtn').addEventListener('click', ()=>{
       status: 'Recibido'
     });
   }
-  repairQueue = [...newEntries.reverse(), ...repairQueue];
+  repairs = [...newEntries.reverse(), ...repairs];
   document.getElementById('rqCustomer').value = '';
   document.querySelector('input[name="rqMode"][value="uno"]').checked = true;
   resetDeviceBlocks('uno');
@@ -1525,8 +1489,8 @@ document.getElementById('saveClient').addEventListener('click', ()=>{
   const phone = document.getElementById('cPhone').value.trim();
   const notes = document.getElementById('cNotes').value.trim();
   if(!name){ alert('El nombre del cliente es obligatorio.'); return; }
-  clientCounter++;
-  const id = 'C-' + String(clientCounter).padStart(3,'0');
+  counters.client++;
+  const id = 'C-' + String(counters.client).padStart(3,'0');
   const since = new Date().toLocaleDateString('es-MX');
   customers.push({id, name, phone, notes, since, balance:0});
   ['cName','cPhone','cNotes'].forEach(fid=>document.getElementById(fid).value='');
@@ -1593,11 +1557,6 @@ function renderPanel(){
 /* ============================================================
    QUICKBAR — accesos rápidos + apertura/cierre de caja
 ============================================================ */
-let cajaAbierta = false;
-let cajaMontoInicial = 0;
-let cajaAperturaHora = null;
-let cortesHistory = [];
-
 document.getElementById('qbCaja').addEventListener('click', openCajaModal);
 document.getElementById('closeCajaModal').addEventListener('click', ()=>document.getElementById('cajaModal').classList.remove('show'));
 document.getElementById('cajaModal').addEventListener('click', e=>{ if(e.target.id==='cajaModal') e.currentTarget.classList.remove('show'); });
@@ -1605,8 +1564,8 @@ document.getElementById('cajaModal').addEventListener('click', e=>{ if(e.target.
 function updateCajaButton(){
   const btn = document.getElementById('qbCaja');
   const label = document.getElementById('qbCajaLabel');
-  btn.classList.toggle('caja-open', cajaAbierta);
-  label.textContent = cajaAbierta ? 'Cerrar caja' : 'Abrir caja';
+  btn.classList.toggle('caja-open', caja.abierta);
+  label.textContent = caja.abierta ? 'Cerrar caja' : 'Abrir caja';
 }
 function montoPorMetodo(tipo, metodo){
   return sales.filter(s=>s.method===metodo && !s.cancelled && s.tipo===tipo).reduce((a,s)=>a+s.total,0);
@@ -1616,7 +1575,7 @@ function efectivoPorTipo(tipo){
 }
 function renderCajaCatHistorial(boxId, categoria){
   const box = document.getElementById(boxId);
-  const items = cortesHistory.filter(c=>c.categoria===categoria);
+  const items = caja.cortes.filter(c=>c.categoria===categoria);
   if(items.length===0){ box.innerHTML=''; return; }
   box.innerHTML = '<h3 class="section-title" style="font-size:12px;margin-bottom:6px;">Historial de cortes (este turno)</h3>' +
     items.slice().reverse().map(c=>`
@@ -1640,8 +1599,8 @@ function refreshCajaCortePanel(){
   const ventaTarjeta = montoPorMetodo('venta','tarjeta');
   const ventaTransferencia = montoPorMetodo('venta','transferencia');
   const ventaTotalCorte = ventaEfectivo + ventaTarjeta + ventaTransferencia;
-  const ventaEsperado = cajaMontoInicial + ventaEfectivo;
-  document.getElementById('cajaMontoInicialTxt').textContent = fmt(cajaMontoInicial);
+  const ventaEsperado = caja.montoInicial + ventaEfectivo;
+  document.getElementById('cajaMontoInicialTxt').textContent = fmt(caja.montoInicial);
   document.getElementById('cajaVentaEfectivo').textContent = fmt(ventaEfectivo);
   document.getElementById('cajaVentaTarjeta').textContent = fmt(ventaTarjeta);
   document.getElementById('cajaVentaTransferencia').textContent = fmt(ventaTransferencia);
@@ -1674,11 +1633,11 @@ document.getElementById('cajaVentaConteo').addEventListener('input', refreshCaja
 document.getElementById('cajaRepConteo').addEventListener('input', refreshCajaCortePanel);
 
 function openCajaModal(){
-  document.getElementById('cajaModalTitle').textContent = cajaAbierta ? 'Corte de caja' : 'Abrir caja';
-  document.getElementById('cajaAbrirBody').style.display = cajaAbierta ? 'none' : 'block';
-  document.getElementById('cajaCerrarBody').style.display = cajaAbierta ? 'block' : 'none';
-  if(cajaAbierta){
-    document.getElementById('cajaHoraApertura').textContent = cajaAperturaHora;
+  document.getElementById('cajaModalTitle').textContent = caja.abierta ? 'Corte de caja' : 'Abrir caja';
+  document.getElementById('cajaAbrirBody').style.display = caja.abierta ? 'none' : 'block';
+  document.getElementById('cajaCerrarBody').style.display = caja.abierta ? 'block' : 'none';
+  if(caja.abierta){
+    document.getElementById('cajaHoraApertura').textContent = caja.aperturaHora;
     document.getElementById('cajaVentaConteo').value = '';
     document.getElementById('cajaRepConteo').value = '';
     refreshCajaCortePanel();
@@ -1689,10 +1648,10 @@ function openCajaModal(){
 }
 document.getElementById('cajaAbrirBtn').addEventListener('click', ()=>{
   const monto = parseFloat(document.getElementById('cajaMontoInput').value)||0;
-  cajaAbierta = true;
-  cajaMontoInicial = monto;
-  cajaAperturaHora = new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'});
-  cortesHistory = [];
+  caja.abierta = true;
+  caja.montoInicial = monto;
+  caja.aperturaHora = new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'});
+  caja.cortes = [];
   updateCajaButton();
   document.getElementById('cajaModal').classList.remove('show');
 });
@@ -1701,10 +1660,10 @@ document.getElementById('cajaVentaParcialBtn').addEventListener('click', ()=>{
   const tarjeta = montoPorMetodo('venta','tarjeta');
   const transferencia = montoPorMetodo('venta','transferencia');
   const totalCorte = efectivo + tarjeta + transferencia;
-  const esperado = cajaMontoInicial + efectivo;
+  const esperado = caja.montoInicial + efectivo;
   const contadoRaw = document.getElementById('cajaVentaConteo').value;
   const contado = contadoRaw==='' ? null : parseFloat(contadoRaw);
-  cortesHistory.push({categoria:'venta', tipo:'Corte parcial', hora:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}), efectivo, tarjeta, transferencia, totalCorte, esperado, contado});
+  caja.cortes.push({categoria:'venta', tipo:'Corte parcial', hora:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}), efectivo, tarjeta, transferencia, totalCorte, esperado, contado});
   alert('Corte parcial de Ventas y refacciones registrado.\nEfectivo: '+fmt(efectivo)+' · Tarjeta: '+fmt(tarjeta)+' · Transferencia: '+fmt(transferencia)+'\nTotal del corte: '+fmt(totalCorte)+(contado!=null?' · Diferencia de efectivo: '+fmt(contado-esperado):'')+'.\nLa caja sigue abierta.');
   refreshCajaCortePanel();
 });
@@ -1716,7 +1675,7 @@ document.getElementById('cajaRepParcialBtn').addEventListener('click', ()=>{
   const esperado = efectivo;
   const contadoRaw = document.getElementById('cajaRepConteo').value;
   const contado = contadoRaw==='' ? null : parseFloat(contadoRaw);
-  cortesHistory.push({categoria:'reparacion', tipo:'Corte parcial', hora:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}), efectivo, tarjeta, transferencia, totalCorte, esperado, contado});
+  caja.cortes.push({categoria:'reparacion', tipo:'Corte parcial', hora:new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}), efectivo, tarjeta, transferencia, totalCorte, esperado, contado});
   alert('Corte parcial de Reparaciones registrado.\nEfectivo: '+fmt(efectivo)+' · Tarjeta: '+fmt(tarjeta)+' · Transferencia: '+fmt(transferencia)+'\nTotal del corte: '+fmt(totalCorte)+(contado!=null?' · Diferencia de efectivo: '+fmt(contado-esperado):'')+'.\nLa caja sigue abierta.');
   refreshCajaCortePanel();
 });
@@ -1725,7 +1684,7 @@ document.getElementById('cajaFinalBtn').addEventListener('click', ()=>{
   const vTarjeta = montoPorMetodo('venta','tarjeta');
   const vTransferencia = montoPorMetodo('venta','transferencia');
   const vTotalCorte = vEfectivo + vTarjeta + vTransferencia;
-  const ventaEsperado = cajaMontoInicial + vEfectivo;
+  const ventaEsperado = caja.montoInicial + vEfectivo;
   const ventaContadoRaw = document.getElementById('cajaVentaConteo').value;
   const ventaContado = ventaContadoRaw==='' ? null : parseFloat(ventaContadoRaw);
 
@@ -1738,11 +1697,11 @@ document.getElementById('cajaFinalBtn').addEventListener('click', ()=>{
   const repContado = repContadoRaw==='' ? null : parseFloat(repContadoRaw);
 
   const hora = new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
-  cortesHistory.push({categoria:'venta', tipo:'Corte final', hora, efectivo:vEfectivo, tarjeta:vTarjeta, transferencia:vTransferencia, totalCorte:vTotalCorte, esperado:ventaEsperado, contado:ventaContado});
-  cortesHistory.push({categoria:'reparacion', tipo:'Corte final', hora, efectivo:rEfectivo, tarjeta:rTarjeta, transferencia:rTransferencia, totalCorte:rTotalCorte, esperado:repEsperado, contado:repContado});
-  cajaAbierta = false;
-  cajaMontoInicial = 0;
-  cajaAperturaHora = null;
+  caja.cortes.push({categoria:'venta', tipo:'Corte final', hora, efectivo:vEfectivo, tarjeta:vTarjeta, transferencia:vTransferencia, totalCorte:vTotalCorte, esperado:ventaEsperado, contado:ventaContado});
+  caja.cortes.push({categoria:'reparacion', tipo:'Corte final', hora, efectivo:rEfectivo, tarjeta:rTarjeta, transferencia:rTransferencia, totalCorte:rTotalCorte, esperado:repEsperado, contado:repContado});
+  caja.abierta = false;
+  caja.montoInicial = 0;
+  caja.aperturaHora = null;
   updateCajaButton();
   document.getElementById('cajaModal').classList.remove('show');
   alert('Corte final registrado y caja cerrada.\n\nVentas y refacciones — Efvo: '+fmt(vEfectivo)+' · Tarjeta: '+fmt(vTarjeta)+' · Transf: '+fmt(vTransferencia)+' · Total: '+fmt(vTotalCorte)+(ventaContado!=null?' · dif efvo: '+fmt(ventaContado-ventaEsperado):'')+
