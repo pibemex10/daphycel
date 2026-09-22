@@ -10,14 +10,14 @@ Tienda de refacciones y accesorios de telefonía. Dos aplicaciones web, cada una
 ## Stack y convenciones técnicas
 
 - **Vanilla HTML/CSS/JS.** Sin framework, sin bundler, sin build step, sin `package.json` para la app en sí. Cada archivo `.html` es autocontenido: su `<style>` y su `<script>` viven en el mismo archivo.
-- **Sin backend.** Todos los datos (`products`, `customers`, `sales`, `jobs`/`repairQueue`, `users`) viven en arrays de JavaScript en memoria. Se reinician al recargar la página — no hay `localStorage` ni servidor todavía.
+- **Sin backend, con fuente única en `localStorage`.** Ambos archivos comparten una sola clave (`refactel_db_v1`) que guarda `products`, `customers`, `sales`, `repairs` (fusión de `repairQueue`/`jobs`), `users`, `counters` y `caja` como JSON. El bloque `seedDB()/loadDB()/saveRaw()/snapshotDB()/saveDB()` es idéntico e inline en ambos archivos (ver detalle completo en `SPEC.md`). Sin sincronización en vivo entre pestañas: los cambios se reflejan al recargar o navegar, última escritura gana. `window.RefacTelDB` expone `read()/save()/reset()` para pruebas.
 - **Dependencias externas** cargadas por CDN únicamente: Google Fonts (Space Grotesk, IBM Plex Sans, IBM Plex Mono), JsBarcode y qrcodejs vía `cdnjs.cloudflare.com`.
 - **Playwright está instalado globalmente en esta máquina** (`npm install -g playwright`, navegador Chromium) exclusivamente como herramienta de testing para el Evaluator del harness. No es una dependencia del proyecto ni implica que la app necesite Node/npm para funcionar — los archivos `.html` se abren directamente en el navegador (`file://`) o se sirven estáticos.
 - **Paleta azul rey** en ambos archivos, con variantes distintas: `refactel.html` usa fondo crema (`#f8f6f1`) con acento `#3d6fd6`; `refactel-cliente.html` usa fondo blanco con acento `#2540d6`. Mantener esta identidad visual al agregar features.
 
 ## Modelo de datos
 
-Actualmente (antes de la unificación en curso) los dos archivos tienen datasets **independientes y con esquemas distintos** — mismo SKU puede tener campos diferentes entre archivos, los clientes no coinciden, y las reparaciones usan estructuras distintas (`repairQueue` en el panel vs. `jobs` en la tienda cliente). Cualquier trabajo que unifique el modelo de datos debe quedar documentado explícitamente en `SPEC.md` antes de tocar código — no asumir la forma final del esquema compartido sin especificarla primero.
+Unificado desde septiembre 2026 (ver `SPEC.md` para el esquema completo y `FINDINGS.md` para su verificación). El catálogo maestro es el de la tienda (20 SKUs, con `desc`/`subcat`/`reviews`); las reparaciones tienen doble identificador (`id` interno `EQ-###` para el panel, `order` público `OR-####` que consulta el cliente). El checkout de la tienda genera una venta real (`method:'online'`, sin IVA, fuera de los cortes de caja). Cualquier cambio futuro al esquema compartido debe documentarse en un nuevo `SPEC.md` (o una sección nueva) antes de tocar código, igual que se hizo para esta unificación.
 
 ## Reglas para cambios (Generator)
 
