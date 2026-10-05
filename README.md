@@ -78,6 +78,25 @@ window.DaphycelDB.read()   // trae el estado completo desde Supabase (products, 
 window.DaphycelDB.reset()  // ya no reinicia nada; solo explica que los datos viven en Supabase
 ```
 
+## Publicado en internet (Netlify)
+
+- **Tienda pública:** https://scintillating-selkie-c94035.netlify.app/daphycel-cliente.html
+- **Panel interno:** https://scintillating-selkie-c94035.netlify.app/daphycel.html
+
+Se publica solo `daphycel.html` y `daphycel-cliente.html` (más un `index.html` que redirige a la
+tienda) — no el resto del repo (docs/SQL). Para volver a publicar después de un cambio:
+
+```powershell
+New-Item -ItemType Directory -Force -Path .\deploy | Out-Null
+Copy-Item .\daphycel.html, .\daphycel-cliente.html .\deploy\ -Force
+npx netlify-cli deploy --dir=.\deploy --prod
+```
+
+La primera vez hace falta `npx netlify-cli login` (abre el navegador para autorizar). Si un sitio
+nuevo responde 401 a todo, revisar en el dashboard de Netlify que **Site settings → Visitor access**
+no tenga el inicio de sesión del equipo forzado para producción (`sso_login_context` no debe ser
+`"all"`) — a este proyecto le pasó por defecto al crear el equipo desde la CLI.
+
 ## Documentación relacionada
 
 - `CLAUDE.md` — convenciones del repo y reglas para cambios, incluida la arquitectura con Supabase.

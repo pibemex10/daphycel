@@ -1,0 +1,5 @@
+# Estado local de Netlify CLI (vincula esta carpeta al sitio; no es secreto, pero es local)
+.netlify/
+
+# Copia de despliegue (se regenera desde daphycel.html / daphycel-cliente.html antes de publicar)
+deploy/
