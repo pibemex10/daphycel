@@ -410,6 +410,7 @@ table.inv tr:hover td{background:var(--surface);}
         <button class="chip active" data-sub="agregar">Agregar mercancía</button>
         <button class="chip" data-sub="editar" id="invTabEditar">Editar mercancía</button>
         <button class="chip" data-sub="borrar" id="invTabBorrar">Borrar mercancía</button>
+        <button class="chip" data-sub="fotos">Fotos</button>
       </div>
 
       <!-- AGREGAR MERCANCÍA -->
@@ -456,6 +457,17 @@ table.inv tr:hover td{background:var(--surface);}
             <tr><th>Producto</th><th>SKU</th><th>Categoría</th><th>Precio</th><th>Stock</th><th></th></tr>
           </thead>
           <tbody id="invDeleteBody"></tbody>
+        </table>
+      </div>
+
+      <!-- FOTOS (disponible para cualquier rol, incluida vendedora) -->
+      <div class="inv-table-wrap card hidden" id="invSubFotos">
+        <p style="padding:14px 16px 0;color:var(--text-dim);font-size:12.5px;">Sube o cambia la foto de cualquier producto. No afecta precio, stock ni descripción.</p>
+        <table class="inv">
+          <thead>
+            <tr><th>Foto</th><th>Producto</th><th>SKU</th><th></th></tr>
+          </thead>
+          <tbody id="invFotosBody"></tbody>
         </table>
       </div>
     </div>
@@ -758,7 +770,7 @@ async function fetchAll(){
   const itemsBySale = {};
   itemRes.data.forEach(it=>{ (itemsBySale[it.sale_id] ||= []).push({sku:it.sku, name:it.name, qty:it.qty, price:Number(it.price)}); });
 
-  const products = prodRes.data.map(p=>({sku:p.sku, name:p.name, cat:p.cat, subcat:p.subcat, price:Number(p.price), stock:p.stock, desc:p.description||'', reviews:reviewsBySku[p.sku]||[]}));
+  const products = prodRes.data.map(p=>({sku:p.sku, name:p.name, cat:p.cat, subcat:p.subcat, price:Number(p.price), stock:p.stock, desc:p.description||'', image_url:p.image_url||null, reviews:reviewsBySku[p.sku]||[]}));
   const customers = custRes.data.map(c=>({id:c.id, name:c.name, phone:c.phone||'', notes:c.notes||'', since:fmtFecha(c.since), balance:Number(c.balance)}));
   const sales = saleRes.data.map(s=>({
     id:s.id, items:itemsBySale[s.id]||[], subtotal:Number(s.subtotal), iva:Number(s.iva), total:Number(s.total),
@@ -1411,12 +1423,60 @@ document.querySelectorAll('#invSubNav .chip').forEach(chip=>{
     document.getElementById('invSubAgregar').classList.toggle('hidden', activeInvSub!=='agregar');
     document.getElementById('invSubEditar').classList.toggle('hidden', activeInvSub!=='editar');
     document.getElementById('invSubBorrar').classList.toggle('hidden', activeInvSub!=='borrar');
+    document.getElementById('invSubFotos').classList.toggle('hidden', activeInvSub!=='fotos');
     renderInventory();
   });
 });
 function renderInventory(){
   if(activeInvSub==='editar') renderInvTable('invEditBody', 'editar');
   if(activeInvSub==='borrar') renderInvTable('invDeleteBody', 'borrar');
+  if(activeInvSub==='fotos') renderInvFotos();
+}
+
+/* ---------- fotos de producto (Supabase Storage, disponible para cualquier rol) ---------- */
+function renderInvFotos(){
+  const body = document.getElementById('invFotosBody');
+  if(products.length===0){ body.innerHTML = '<tr><td colspan="4" class="empty">No hay productos en el inventario.</td></tr>'; return; }
+  body.innerHTML = products.map(p=>`
+    <tr>
+      <td>${p.image_url
+        ? `<img src="${p.image_url}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:7px;border:1px solid var(--border);">`
+        : `<div style="width:40px;height:40px;border-radius:7px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:11px;">Sin foto</div>`}</td>
+      <td>${p.name}</td>
+      <td class="mono">${p.sku}</td>
+      <td>
+        <input type="file" accept="image/*" class="hidden" data-photo-input="${p.sku}">
+        <button class="btn btn-sm" data-photo-btn="${p.sku}">${p.image_url ? 'Cambiar foto' : 'Subir foto'}</button>
+      </td>
+    </tr>
+  `).join('');
+  body.querySelectorAll('[data-photo-btn]').forEach(b=>b.addEventListener('click', ()=>{
+    body.querySelector(`[data-photo-input="${b.dataset.photoBtn}"]`).click();
+  }));
+  body.querySelectorAll('[data-photo-input]').forEach(inp=>inp.addEventListener('change', async ()=>{
+    const file = inp.files[0];
+    if(!file) return;
+    await uploadProductPhoto(inp.dataset.photoInput, file);
+  }));
+}
+async function uploadProductPhoto(sku, file){
+  if(!file.type.startsWith('image/')){ alert('Elige un archivo de imagen.'); return; }
+  if(file.size > 5*1024*1024){ alert('La imagen pesa más de 5 MB — elige una más ligera.'); return; }
+  const btn = document.querySelector(`#invFotosBody [data-photo-btn="${sku}"]`);
+  const prevText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Subiendo...'; }
+  try{
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+    const path = `${sku}-${Date.now()}.${ext}`;
+    sbThrow(await sb.storage.from('product-images').upload(path, file, {upsert:true, contentType:file.type}));
+    const { data:{ publicUrl } } = sb.storage.from('product-images').getPublicUrl(path);
+    sbThrow(await sb.from('products').update({image_url:publicUrl}).eq('sku', sku));
+    await reloadFromStore();
+    renderInvFotos();
+  }catch(e){
+    showDbError(e);
+    if(btn){ btn.disabled = false; btn.textContent = prevText; }
+  }
 }
 function renderInvTable(tbodyId, mode){
   const body = document.getElementById(tbodyId);
