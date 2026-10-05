@@ -1,5 +1,10 @@
 # SPEC — Unificación del modelo de datos de Daphycel (fuente única en el navegador)
 
+> **Superado (octubre 2026):** este documento describe la primera versión de la fuente única,
+> sobre `localStorage` (sincronizaba solo entre pestañas del mismo navegador). Se mantiene como
+> contexto histórico de esa decisión y su verificación (ver `FINDINGS.md`). La app ahora usa un
+> backend real en Supabase — ver `CLAUDE.md`, `README.md` y `supabase-schema.sql`/`supabase-schema-2.sql`.
+
 ## 1. Objetivo
 
 Unificar `daphycel.html` (panel interno) y `daphycel-cliente.html` (tienda pública) sobre **una sola fuente de verdad persistida en `localStorage`**, de modo que ventas, cobros de reparación, movimientos de inventario, abonos de clientes y reseñas registrados en cualquiera de las dos apps se reflejen en la otra al recargarla o navegar hacia ella, conservando ambos archivos separados y todas sus funcionalidades actuales.
