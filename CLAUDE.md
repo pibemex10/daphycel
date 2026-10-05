@@ -19,6 +19,8 @@ Tienda de refacciones y accesorios de telefonía. Dos aplicaciones web, cada una
 
 Unificado desde septiembre 2026 (ver `SPEC.md` para el esquema completo y `FINDINGS.md` para su verificación). El catálogo maestro es el de la tienda (20 SKUs, con `desc`/`subcat`/`reviews`); las reparaciones tienen doble identificador (`id` interno `EQ-###` para el panel, `order` público `OR-####` que consulta el cliente). El checkout de la tienda genera una venta real (`method:'online'`, sin IVA, fuera de los cortes de caja). Cualquier cambio futuro al esquema compartido debe documentarse en un nuevo `SPEC.md` (o una sección nueva) antes de tocar código, igual que se hizo para esta unificación.
 
+**Campo `notifyEmail`** (octubre 2026, string, `''` por defecto): correo al que se avisa cuando se cambia la contraseña de cualquier cuenta. Solo se edita desde la vista Usuarios del panel (ya restringida al rol `dueno`); la tienda lo hidrata y lo reescribe sin usarlo, igual que con `users`/`caja`/`counters`. Como la app no tiene backend ni servicio de correo, el aviso se envía abriendo un enlace `mailto:` con el mensaje redactado — no hay envío automático real ni se expone ninguna credencial de proveedor de email en el código.
+
 ## Reglas para cambios (Generator)
 
 - **Cambios quirúrgicos.** Preferir ediciones puntuales sobre reescribir archivos completos. Mantener el estilo, nombres de variables/funciones y estructura ya existentes en cada archivo.

@@ -218,7 +218,6 @@ table.inv tr:hover td{background:var(--surface);}
     <div class="field" style="margin-top:10px;"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"></div>
     <p id="loginError" class="hidden" style="color:var(--danger);font-size:12.5px;margin-top:8px;">Usuario o contraseña incorrectos.</p>
     <button class="btn btn-primary" id="loginBtn" style="width:100%;margin-top:16px;">Iniciar sesión</button>
-    <p style="color:var(--text-faint);font-size:11px;margin-top:14px;text-align:center;line-height:1.6;">Cuentas de prueba:<br>Dueño: <span class="mono">dueno / dueno123</span><br>Administrador: <span class="mono">admin / admin123</span><br>Vendedor: <span class="mono">vendedor / vendedor123</span></p>
   </div>
 </div>
 
@@ -504,6 +503,15 @@ table.inv tr:hover td{background:var(--surface);}
     </div>
 
     <div class="card" style="padding:18px;margin-bottom:22px;">
+      <h3 class="section-title">Correo de notificaciones</h3>
+      <p style="color:var(--text-dim);font-size:12.5px;margin-bottom:10px;">Cuando se cambia la contraseña de cualquier cuenta (incluida la del dueño), se avisa a este correo. Solo el dueño puede verlo y editarlo.</p>
+      <div class="form-grid wide">
+        <div class="field"><label>Correo</label><input type="email" id="notifyEmailInput" placeholder="Ej. dueno@tutienda.com"></div>
+      </div>
+      <button class="btn btn-primary" id="saveNotifyEmailBtn" style="margin-top:10px;">Guardar correo</button>
+    </div>
+
+    <div class="card" style="padding:18px;margin-bottom:22px;">
       <h3 class="section-title">Nueva cuenta</h3>
       <div class="form-grid">
         <div class="field"><label>Nombre</label><input type="text" id="uName" placeholder="Ej. Luis Fernández"></div>
@@ -673,6 +681,19 @@ table.inv tr:hover td{background:var(--surface);}
   </div>
 </div>
 
+<!-- change password modal -->
+<div class="modal-bg" id="pwdModal">
+  <div class="modal" style="width:320px;text-align:left;">
+    <h3>Cambiar contraseña</h3>
+    <p class="mono" id="pwdUserInfo" style="color:var(--text-faint);font-size:12px;margin:6px 0 14px;"></p>
+    <div class="field"><label>Nueva contraseña</label><input type="text" id="pwdNewInput" placeholder="Nueva contraseña"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-primary" id="pwdConfirmBtn" style="flex:1;">Guardar</button>
+      <button class="btn" id="pwdCancelBtn">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- receipt modal -->
 <div class="modal-bg" id="receiptModal">
   <div class="modal" style="width:300px;">
@@ -774,6 +795,7 @@ function seedDB(){
     ],
     counters: {sale:1005, client:5, repair:12, order:1012},
     caja: {abierta:false, montoInicial:0, aperturaHora:null, aperturaTs:null, cortes:[]},
+    notifyEmail: '',
   };
 }
 
@@ -792,6 +814,7 @@ function loadDB(){
   ['sale','client','repair','order'].forEach(k=>{ if(typeof db.counters[k]!=='number') db.counters[k] = base.counters[k]; });
   if(!db.caja || typeof db.caja!=='object') db.caja = base.caja;
   if(!Array.isArray(db.caja.cortes)) db.caja.cortes = [];
+  if(typeof db.notifyEmail!=='string') db.notifyEmail = base.notifyEmail;
   db.version = DB_VERSION;
   saveRaw(db);
   return db;
@@ -805,9 +828,10 @@ let repairs = DB.repairs;
 let users = DB.users;
 let counters = DB.counters;
 let caja = DB.caja;
+let notifyEmail = DB.notifyEmail;
 
 function snapshotDB(){
-  return {version:DB_VERSION, products, customers, sales, repairs, users, counters, caja};
+  return {version:DB_VERSION, products, customers, sales, repairs, users, counters, caja, notifyEmail};
 }
 function saveDB(){ saveRaw(snapshotDB()); }
 /* Re-lee el store al navegar entre vistas: evita que un snapshot viejo pise
@@ -816,6 +840,7 @@ function reloadFromStore(){
   const fresh = loadDB();
   products = fresh.products; customers = fresh.customers; sales = fresh.sales;
   repairs = fresh.repairs; users = fresh.users; counters = fresh.counters; caja = fresh.caja;
+  notifyEmail = fresh.notifyEmail;
 }
 
 window.DaphycelDB = {
@@ -881,7 +906,7 @@ function switchView(v){
   if(v==='clientes') renderClientes();
   if(v==='inventario') renderInventory();
   if(v==='panel') renderPanel();
-  if(v==='usuarios') renderUsersList();
+  if(v==='usuarios'){ renderUsersList(); document.getElementById('notifyEmailInput').value = notifyEmail || ''; }
 }
 
 /* ============================================================
@@ -942,7 +967,7 @@ function renderUsersList(){
       <td class="mono">${u.username}</td>
       <td class="mono">${u.password}</td>
       <td><span class="user-role-tag ${u.role}">${roleNames[u.role]}</span></td>
-      <td>${u.role==='dueno' ? '—' : `<button class="btn btn-sm btn-danger" data-deluser="${u.username}">Eliminar</button>`}</td>
+      <td><button class="btn btn-sm" data-pwduser="${u.username}">Cambiar contraseña</button> ${u.role==='dueno' ? '' : `<button class="btn btn-sm btn-danger" data-deluser="${u.username}">Eliminar</button>`}</td>
     </tr>
   `).join('');
   body.querySelectorAll('[data-deluser]').forEach(b=>b.addEventListener('click', ()=>{
@@ -952,8 +977,49 @@ function renderUsersList(){
       renderUsersList(); renderPanelUsers();
     }
   }));
+  body.querySelectorAll('[data-pwduser]').forEach(b=>b.addEventListener('click', ()=>openPwdModal(b.dataset.pwduser)));
   renderPanelUsers();
 }
+
+/* ---------- cambio de contraseña (cualquier cuenta, incluida la del dueño) ---------- */
+let pwdEditingUsername = null;
+function openPwdModal(username){
+  const u = users.find(x=>x.username===username);
+  if(!u) return;
+  pwdEditingUsername = username;
+  document.getElementById('pwdUserInfo').textContent = u.name+' · '+u.username;
+  document.getElementById('pwdNewInput').value = '';
+  document.getElementById('pwdModal').classList.add('show');
+}
+document.getElementById('pwdCancelBtn').addEventListener('click', ()=>document.getElementById('pwdModal').classList.remove('show'));
+document.getElementById('pwdModal').addEventListener('click', e=>{ if(e.target.id==='pwdModal') e.currentTarget.classList.remove('show'); });
+document.getElementById('pwdConfirmBtn').addEventListener('click', ()=>{
+  const u = users.find(x=>x.username===pwdEditingUsername);
+  const newPass = document.getElementById('pwdNewInput').value.trim();
+  if(!u) return;
+  if(!newPass){ alert('Escribe la nueva contraseña.'); return; }
+  u.password = newPass;
+  saveDB();
+  document.getElementById('pwdModal').classList.remove('show');
+  renderUsersList();
+  const sent = notifyPasswordChange(u.username);
+  alert('Contraseña actualizada correctamente.' + (sent ? ' Se abrió un correo de aviso para '+notifyEmail+'.' : ' No hay correo de notificaciones configurado — puedes agregarlo arriba.'));
+});
+/* Sin backend no se puede enviar un correo real desde el navegador sin exponer
+   credenciales de un proveedor de email; en vez de eso se abre un mailto: con
+   el aviso ya redactado para que el dueño lo envíe desde su propio cliente de correo. */
+function notifyPasswordChange(username){
+  if(!notifyEmail) return false;
+  const subject = encodeURIComponent('Daphycel · Cambio de contraseña');
+  const body = encodeURIComponent('Se cambió la contraseña de la cuenta "'+username+'" el '+new Date().toLocaleString('es-MX')+'.\n\nSi no reconoces este cambio, revisa el acceso de inmediato.');
+  window.open('mailto:'+notifyEmail+'?subject='+subject+'&body='+body, '_blank');
+  return true;
+}
+document.getElementById('saveNotifyEmailBtn').addEventListener('click', ()=>{
+  notifyEmail = document.getElementById('notifyEmailInput').value.trim();
+  saveDB();
+  alert(notifyEmail ? 'Correo de notificaciones guardado: '+notifyEmail : 'Correo de notificaciones eliminado. No se enviarán avisos.');
+});
 function renderPanelUsers(){
   const box = document.getElementById('panelUsersList');
   if(!box) return;

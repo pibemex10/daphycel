@@ -378,6 +378,7 @@ function seedDB(){
     ],
     counters: {sale:1005, client:5, repair:12, order:1012},
     caja: {abierta:false, montoInicial:0, aperturaHora:null, aperturaTs:null, cortes:[]},
+    notifyEmail: '',
   };
 }
 
@@ -396,6 +397,7 @@ function loadDB(){
   ['sale','client','repair','order'].forEach(k=>{ if(typeof db.counters[k]!=='number') db.counters[k] = base.counters[k]; });
   if(!db.caja || typeof db.caja!=='object') db.caja = base.caja;
   if(!Array.isArray(db.caja.cortes)) db.caja.cortes = [];
+  if(typeof db.notifyEmail!=='string') db.notifyEmail = base.notifyEmail;
   db.version = DB_VERSION;
   saveRaw(db);
   return db;
@@ -409,9 +411,10 @@ let repairs = DB.repairs;
 let users = DB.users;
 let counters = DB.counters;
 let caja = DB.caja;
+let notifyEmail = DB.notifyEmail;
 
 function snapshotDB(){
-  return {version:DB_VERSION, products, customers, sales, repairs, users, counters, caja};
+  return {version:DB_VERSION, products, customers, sales, repairs, users, counters, caja, notifyEmail};
 }
 function saveDB(){ saveRaw(snapshotDB()); }
 /* Re-lee el store al navegar entre vistas: evita que un snapshot viejo pise
@@ -420,6 +423,7 @@ function reloadFromStore(){
   const fresh = loadDB();
   products = fresh.products; customers = fresh.customers; sales = fresh.sales;
   repairs = fresh.repairs; users = fresh.users; counters = fresh.counters; caja = fresh.caja;
+  notifyEmail = fresh.notifyEmail;
 }
 
 window.DaphycelDB = {
