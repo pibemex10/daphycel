@@ -1,8 +1,8 @@
-# SPEC — Unificación del modelo de datos de RefacTel (fuente única en el navegador)
+# SPEC — Unificación del modelo de datos de Daphycel (fuente única en el navegador)
 
 ## 1. Objetivo
 
-Unificar `refactel.html` (panel interno) y `refactel-cliente.html` (tienda pública) sobre **una sola fuente de verdad persistida en `localStorage`**, de modo que ventas, cobros de reparación, movimientos de inventario, abonos de clientes y reseñas registrados en cualquiera de las dos apps se reflejen en la otra al recargarla o navegar hacia ella, conservando ambos archivos separados y todas sus funcionalidades actuales.
+Unificar `daphycel.html` (panel interno) y `daphycel-cliente.html` (tienda pública) sobre **una sola fuente de verdad persistida en `localStorage`**, de modo que ventas, cobros de reparación, movimientos de inventario, abonos de clientes y reseñas registrados en cualquiera de las dos apps se reflejen en la otra al recargarla o navegar hacia ella, conservando ambos archivos separados y todas sus funcionalidades actuales.
 
 ---
 
@@ -10,7 +10,7 @@ Unificar `refactel.html` (panel interno) y `refactel-cliente.html` (tienda públ
 
 ### SÍ incluye
 
-1. Capa de persistencia `localStorage` con **una sola clave** (`refactel_db_v1`) que guarda todo el estado compartido en JSON.
+1. Capa de persistencia `localStorage` con **una sola clave** (`daphycel_db_v1`) que guarda todo el estado compartido en JSON.
 2. **Esquema unificado** de `products`, `customers`, `sales`, `repairs` (fusión de `repairQueue` del panel + `jobs` de la tienda), `users`, `counters` y `caja`.
 3. **Semilla (seed) idéntica byte a byte** en ambos archivos: la app que se abra primero con almacenamiento vacío escribe exactamente el mismo dataset.
 4. Hidratación al cargar (`loadDB()`) y guardado en **todos** los puntos de mutación (`saveDB()`), listados en §7.3.
@@ -20,7 +20,7 @@ Unificar `refactel.html` (panel interno) y `refactel-cliente.html` (tienda públ
 8. Reseñas publicadas en la tienda → persisten dentro del producto y **no se pierden** al editar ese producto desde el panel.
 9. Campo `desc` (descripción de tienda) editable desde el formulario de alta y el modal de edición de inventario del panel.
 10. Caja: `abierta`, `montoInicial`, hora/`ts` de apertura e historial de cortes persistidos; los cortes cuentan **solo** las ventas del turno abierto (filtro por `ts`).
-11. API global de depuración/pruebas `window.RefacTelDB` en ambos archivos (§7.2).
+11. API global de depuración/pruebas `window.DaphycelDB` en ambos archivos (§7.2).
 12. Tolerancia a fallos: JSON corrupto o `localStorage` no disponible ⇒ la app arranca con el seed en memoria, sin excepciones no capturadas.
 
 ### NO incluye
@@ -43,10 +43,10 @@ Credenciales del panel (sin cambio): `dueno/dueno123` (dueño), `admin/admin123`
 ### 3.1 Arranque / siembra (ambas apps)
 
 - **Input:** carga del documento.
-- **Proceso:** `loadDB()` lee `localStorage['refactel_db_v1']`. Si no existe, no parsea, o `version !== 1` ⇒ genera `seedDB()`, lo escribe y lo usa. Hidrata las variables globales `products`, `customers`, `sales`, `repairs`, `users`, `counters`, `caja`.
+- **Proceso:** `loadDB()` lee `localStorage['daphycel_db_v1']`. Si no existe, no parsea, o `version !== 1` ⇒ genera `seedDB()`, lo escribe y lo usa. Hidrata las variables globales `products`, `customers`, `sales`, `repairs`, `users`, `counters`, `caja`.
 - **Output:** la clave existe en `localStorage` con las 7 colecciones; la UI renderiza los datos del store.
 
-### 3.2 Panel — Venta en POS (`refactel.html` → pestaña "Punto de venta")
+### 3.2 Panel — Venta en POS (`daphycel.html` → pestaña "Punto de venta")
 
 - **Input:** productos en el ticket, método de pago (`efectivo|tarjeta|transferencia|credito`), cliente opcional, efectivo recibido.
 - **Proceso:** valida igual que hoy (crédito exige cliente; efectivo exige `cash >= total`), descuenta stock, crea `sale` con `id:'V-'+(++counters.sale)`, `tipo:'venta'`, `ts:Date.now()`, IVA 16 %; si es crédito suma `total` al `balance` del cliente. Llama `saveDB()`.
@@ -86,7 +86,7 @@ Credenciales del panel (sin cambio): `dueno/dueno123` (dueño), `admin/admin123`
 - **Corte parcial (Ventas / Reparaciones)**: suma por método **solo** las ventas no canceladas del `tipo` correspondiente con `ts >= caja.aperturaTs`; empuja el registro a `caja.cortes`. `saveDB()`.
 - **Corte final**: empuja los dos cortes (venta + reparación), pone `caja.abierta=false`, `montoInicial=0`, `aperturaHora=null`, `aperturaTs=null`. `saveDB()`.
 
-### 3.8 Tienda — Catálogo y reseñas (`refactel-cliente.html`)
+### 3.8 Tienda — Catálogo y reseñas (`daphycel-cliente.html`)
 
 - **Catálogo**: lee `products` del store; grupos y submenús actuales sin cambio.
 - **Ficha de producto**: muestra `desc`, stock, precio, promedio de estrellas y reseñas.
@@ -116,7 +116,7 @@ Credenciales del panel (sin cambio): `dueno/dueno123` (dueño), `admin/admin123`
 
 ## 4. Modelo de datos
 
-Clave única: **`refactel_db_v1`**. Valor: un JSON con esta forma exacta.
+Clave única: **`daphycel_db_v1`**. Valor: un JSON con esta forma exacta.
 
 ```jsonc
 {
@@ -140,7 +140,7 @@ Clave única: **`refactel_db_v1`**. Valor: un JSON con esta forma exacta.
 | `desc` | string | descripción de tienda (puede ser `''`) |
 | `reviews` | array | `[{author, rating:1..5, comment, date}]`, más recientes primero |
 
-Seed: los **20 productos** de `refactel-cliente.html` (líneas 326-347 del archivo actual), tal cual, agregando `subcat:null` a los que no lo tienen. Es superconjunto del catálogo del panel.
+Seed: los **20 productos** de `daphycel-cliente.html` (líneas 326-347 del archivo actual), tal cual, agregando `subcat:null` a los que no lo tienen. Es superconjunto del catálogo del panel.
 
 ### 4.2 `customers[]`
 
@@ -244,9 +244,9 @@ Tienda: `cart`, `loggedInCustomer`, `activeGroup`, `activeCat`, `searchTerm`, `a
 
 - **Vanilla HTML/CSS/JS**, sin framework, sin build. Dos archivos autocontenidos en la raíz:
   ```
-  RefacTel/
-    refactel.html          # panel interno
-    refactel-cliente.html  # tienda pública
+  Daphycel/
+    daphycel.html          # panel interno
+    daphycel-cliente.html  # tienda pública
     CLAUDE.md
     SPEC.md
   ```
@@ -257,7 +257,7 @@ Tienda: `cart`, `loggedInCustomer`, `activeGroup`, `activeCat`, `searchTerm`, `a
 - **Capa de persistencia** — idéntica en ambos archivos, colocada **al inicio del `<script>`, antes de cualquier declaración de datos**:
 
   ```js
-  const DB_KEY = 'refactel_db_v1';
+  const DB_KEY = 'daphycel_db_v1';
   const DB_VERSION = 1;
   function seedDB(){ /* objeto completo de §4, literal e idéntico en ambos archivos */ }
   function loadDB(){
@@ -280,9 +280,9 @@ Tienda: `cart`, `loggedInCustomer`, `activeGroup`, `activeCat`, `searchTerm`, `a
 - **Idioma español** en toda la UI, datos de ejemplo y mensajes.
 - **Paleta**: sin cambios (`#f8f6f1`/`#3d6fd6` en el panel; blanco/`#2540d6` en la tienda).
 - **Comandos de dev / cómo probar**:
-  - Uso normal: abrir `refactel.html` o `refactel-cliente.html` con doble clic (`file://`).
+  - Uso normal: abrir `daphycel.html` o `daphycel-cliente.html` con doble clic (`file://`).
   - Pruebas automatizadas (recomendado, garantiza un origen HTTP compartido y estable):
-    `python -m http.server 8000` desde `C:\Users\elpib\Videos\Claude Code\RefacTel` y abrir `http://localhost:8000/refactel.html` y `http://localhost:8000/refactel-cliente.html`.
+    `python -m http.server 8000` desde `C:\Users\elpib\Videos\Claude Code\Daphycel` y abrir `http://localhost:8000/daphycel.html` y `http://localhost:8000/daphycel-cliente.html`.
   - Playwright (global) debe usar **el mismo `browserContext`** para ambas páginas, de lo contrario no comparten `localStorage`.
 - **Reglas de implementación (Generator)**: ediciones quirúrgicas sobre los archivos existentes, conservando estilo, nombres y estructura; el bloque `seedDB()` debe ser **texto idéntico** en los dos archivos (escribirlo una vez y copiarlo); commits chicos en español.
 
@@ -294,8 +294,8 @@ Tienda: `cart`, `loggedInCustomer`, `activeGroup`, `activeCat`, `searchTerm`, `a
 ### 5.2 API global de pruebas (ambos archivos)
 
 ```js
-window.RefacTelDB = {
-  KEY: 'refactel_db_v1',
+window.DaphycelDB = {
+  KEY: 'daphycel_db_v1',
   read(){ /* devuelve el objeto parseado desde localStorage */ },
   save(){ saveDB(); },
   reset(){ /* escribe seedDB() en localStorage y recarga la página con location.reload() */ }
@@ -306,7 +306,7 @@ window.RefacTelDB = {
 
 ## 6. Assumptions (decisiones tomadas por el Planner)
 
-1. **Mecanismo elegido: `localStorage` con una sola clave** `refactel_db_v1` (no IndexedDB, no varias claves). Un único `JSON.stringify` evita estados parcialmente escritos.
+1. **Mecanismo elegido: `localStorage` con una sola clave** `daphycel_db_v1` (no IndexedDB, no varias claves). Un único `JSON.stringify` evita estados parcialmente escritos.
 2. **Sin sincronización en vivo** entre pestañas abiertas a la vez; los cambios se ven al recargar/navegar, que es lo pedido. Si dos pestañas están abiertas, gana la última en escribir.
 3. `file://` y `http://localhost` son orígenes distintos: los datos no se comparten entre ambos modos. Es esperado y no es un fallo.
 4. Si `localStorage` lanza (modo restringido, Safari en `file://`), la app funciona en memoria con el seed y **no** rompe; la sincronización entre apps simplemente no ocurre en ese entorno.
@@ -321,7 +321,7 @@ window.RefacTelDB = {
 13. `cost` es el campo monetario canónico de una reparación (sustituye a `chargedAmount`); al cobrar se fija `cost = monto` y `charged = true`.
 14. `users`, `caja` y `counters` viven en el mismo blob aunque la tienda no los use: la tienda los lee y los reescribe sin modificarlos.
 15. El carrito, el ticket del POS y la sesión (usuario del panel / cliente de "Mi cuenta") **no** se persisten: cada carga exige volver a iniciar sesión, como hoy.
-16. `window.RefacTelDB.reset()` existe como punto de reinicio determinista para pruebas; no se agrega botón visible en la UI.
+16. `window.DaphycelDB.reset()` existe como punto de reinicio determinista para pruebas; no se agrega botón visible en la UI.
 17. Se conserva el `type` de reparación (`reparacion|glass|software`) porque la tienda ya lo modela; las altas desde el panel usan siempre `reparacion` (no se agrega selector).
 18. `methodLabel()` se replica en la tienda (hoy no existe) e incluye `online → 'Pedido en línea'` en ambos archivos.
 
@@ -329,15 +329,15 @@ window.RefacTelDB = {
 
 ## 7. Rubric de evaluación
 
-Ejecutar con Playwright/Chromium, un **único `browserContext`**, sirviendo la carpeta en `http://localhost:8000`. Salvo indicación contraria, cada criterio parte de `localStorage.clear()` + recarga. `DB` = `JSON.parse(localStorage.getItem('refactel_db_v1'))`. Login del panel con `dueno/dueno123` salvo que se indique otro.
+Ejecutar con Playwright/Chromium, un **único `browserContext`**, sirviendo la carpeta en `http://localhost:8000`. Salvo indicación contraria, cada criterio parte de `localStorage.clear()` + recarga. `DB` = `JSON.parse(localStorage.getItem('daphycel_db_v1'))`. Login del panel con `dueno/dueno123` salvo que se indique otro.
 
-1. **Dos archivos, autocontenidos.** Existen `refactel.html` y `refactel-cliente.html` en la raíz; no hay archivos `.js`/`.css` nuevos en el proyecto y ningún `<script src>` ni `<link href>` apunta a rutas locales (solo `cdnjs.cloudflare.com` y `fonts.googleapis.com`/`fonts.gstatic.com`).
-2. **Siembra en el panel.** Con `localStorage` vacío, abrir `refactel.html` crea `refactel_db_v1` con `version === 1` y las claves `products, customers, sales, repairs, users, counters, caja`.
+1. **Dos archivos, autocontenidos.** Existen `daphycel.html` y `daphycel-cliente.html` en la raíz; no hay archivos `.js`/`.css` nuevos en el proyecto y ningún `<script src>` ni `<link href>` apunta a rutas locales (solo `cdnjs.cloudflare.com` y `fonts.googleapis.com`/`fonts.gstatic.com`).
+2. **Siembra en el panel.** Con `localStorage` vacío, abrir `daphycel.html` crea `daphycel_db_v1` con `version === 1` y las claves `products, customers, sales, repairs, users, counters, caja`.
 3. **Siembra idéntica.** `localStorage.clear()` + abrir el panel ⇒ guardar `JSON.stringify(DB.products)`, `DB.customers`, `DB.repairs`. Repetir con `localStorage.clear()` + abrir la tienda. Los tres strings son **iguales** entre ambos casos.
 4. **Volúmenes del seed.** `DB.products.length === 20`, `DB.customers.length === 5`, `DB.sales.length === 5`, `DB.repairs.length === 12`, `DB.users.length === 3`, `DB.counters.sale === 1005`, `DB.counters.order === 1012`.
 5. **Catálogo compartido.** En el panel (vista Tienda/Inventario→Editar) se listan 20 productos; en la tienda, la suma de productos visibles en los grupos Refacciones + Insumos + Herramientas es 20.
 6. **Venta en efectivo baja stock en ambas apps.** Panel → POS → escanear `PANT-001` → efectivo `$2000` → Cobrar. `DB.products` con `sku==='PANT-001'` tiene `stock === 13`. Recargar la tienda: la ficha de `PANT-001` muestra "13 pzas".
-7. **La venta persiste en el panel.** Tras recargar `refactel.html` y volver a entrar, el Panel de estadísticas muestra 6 ventas y el folio nuevo `V-1006` aparece en la lista de ventas recientes.
+7. **La venta persiste en el panel.** Tras recargar `daphycel.html` y volver a entrar, el Panel de estadísticas muestra 6 ventas y el folio nuevo `V-1006` aparece en la lista de ventas recientes.
 8. **Venta a crédito impacta la cartera y "Mi cuenta".** Panel → POS → producto + cliente `José Martínez` + método Crédito → Cobrar. El `balance` de `C-001` en `DB` aumentó exactamente el total de la venta. Recargar la tienda → "Mi cuenta" → buscar `C-001` ⇒ el saldo mostrado coincide con `fmt(DB.customers[0].balance)` y la venta nueva aparece en el historial.
 9. **Abono cruzado.** Panel → Clientes → `José Martínez` → abonar `$100` ⇒ `balance` baja 100 en `DB`. Recargar la tienda → "Mi cuenta" de `C-001` muestra el saldo reducido.
 10. **Reseña desde la tienda persiste.** Tienda → ficha de `BAT-001` → nombre "Ana Prueba", 5 estrellas, comentario "Excelente batería" → Publicar. La reseña aparece en la lista sin recargar, y tras recargar la página sigue presente; en `DB`, `products[sku==='BAT-001'].reviews[0].author === 'Ana Prueba'`.
@@ -352,8 +352,8 @@ Ejecutar con Playwright/Chromium, un **único `browserContext`**, sirviendo la c
 19. **Caja persistente con cortes por turno.** Panel → "Abrir caja" con `$1000` ⇒ recargar el panel: el botón del quickbar dice "Cerrar caja" y `DB.caja.abierta === true`. Registrar una venta en efectivo de `$100` (cualquier producto) y abrir el corte: el efectivo de "Ventas y refacciones" del corte es el de esa venta (no incluye las ventas semilla, cuyo `ts` es previo). Corte final ⇒ `DB.caja.abierta === false` y `DB.caja.cortes.length >= 2`.
 20. **Cancelación repone stock en ambas apps.** Panel (dueño) → POS → Cancelaciones → cancelar la venta del criterio 6 ⇒ la venta queda `cancelled === true` y `PANT-001` vuelve a `stock === 14`; recargar la tienda ⇒ la ficha muestra "14 pzas".
 21. **Roles intactos.** Login `vendedor/vendedor123`: la pestaña "Usuarios" no es visible y la vista Panel muestra el bloqueo (`#panelLocked` visible, `#panelContent` oculto). Login `admin/admin123`: los sub-tabs de Inventario "Editar" y "Borrar" están visibles.
-22. **Usuarios persistentes.** Dueño → Usuarios → crear `{Nombre: 'Prueba QA', usuario: 'qa', contraseña: 'qa123', rol: vendedor}` ⇒ recargar `refactel.html` e iniciar sesión con `qa/qa123` ⇒ entra y la etiqueta de sesión dice "Prueba QA · Vendedor".
-23. **Reset determinista.** Ejecutar `window.RefacTelDB.reset()` en cualquiera de las dos apps ⇒ `DB` vuelve al seed (`products.length === 20`, `sales.length === 5`, `counters.sale === 1005`) y la otra app, al recargar, muestra el catálogo original (p. ej. `PANT-001` con 14 pzas).
-24. **Tolerancia a datos corruptos.** Con `localStorage.setItem('refactel_db_v1', '{esto no es json')`, abrir cualquiera de las dos apps ⇒ carga normalmente (catálogo con 20 productos), reescribe el seed válido en la clave y **no** se registran errores no capturados en la consola (`pageerror`).
+22. **Usuarios persistentes.** Dueño → Usuarios → crear `{Nombre: 'Prueba QA', usuario: 'qa', contraseña: 'qa123', rol: vendedor}` ⇒ recargar `daphycel.html` e iniciar sesión con `qa/qa123` ⇒ entra y la etiqueta de sesión dice "Prueba QA · Vendedor".
+23. **Reset determinista.** Ejecutar `window.DaphycelDB.reset()` en cualquiera de las dos apps ⇒ `DB` vuelve al seed (`products.length === 20`, `sales.length === 5`, `counters.sale === 1005`) y la otra app, al recargar, muestra el catálogo original (p. ej. `PANT-001` con 14 pzas).
+24. **Tolerancia a datos corruptos.** Con `localStorage.setItem('daphycel_db_v1', '{esto no es json')`, abrir cualquiera de las dos apps ⇒ carga normalmente (catálogo con 20 productos), reescribe el seed válido en la clave y **no** se registran errores no capturados en la consola (`pageerror`).
 
 **Definición de terminado:** los 24 criterios pasan.

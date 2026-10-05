@@ -1,10 +1,10 @@
-# RefacTel
+# Daphycel
 
 Tienda de refacciones y accesorios de telefonía. Dos aplicaciones web autocontenidas que
 comparten **una sola fuente de verdad** guardada en `localStorage`.
 
-- **`refactel.html`** — panel interno (login, POS, caja, clientes, inventario, usuarios).
-- **`refactel-cliente.html`** — tienda pública (catálogo, reseñas, carrito, reparaciones, Mi cuenta).
+- **`daphycel.html`** — panel interno (login, POS, caja, clientes, inventario, usuarios).
+- **`daphycel-cliente.html`** — tienda pública (catálogo, reseñas, carrito, reparaciones, Mi cuenta).
 
 Lo que se registra en cualquiera de las dos se refleja en la otra **al recargarla o navegar hacia ella**.
 
@@ -13,8 +13,8 @@ Lo que se registra en cualquiera de las dos se refleja en la otra **al recargarl
 Abrir el archivo directamente en el navegador. No hay build, backend ni `npm install`.
 
 ```powershell
-Start-Process .\refactel.html          # panel interno
-Start-Process .\refactel-cliente.html  # tienda pública
+Start-Process .\daphycel.html          # panel interno
+Start-Process .\daphycel-cliente.html  # tienda pública
 ```
 
 Credenciales del panel: `dueno/dueno123`, `admin/admin123`, `vendedor/vendedor123`.
@@ -31,10 +31,10 @@ python -m http.server 8000
 Si no hay Python en la máquina, el equivalente con Node (no agrega archivos al proyecto):
 
 ```powershell
-node --% -e "const h=require('http'),f=require('fs'),p=require('path');h.createServer((q,s)=>{const u=decodeURIComponent(q.url.split('?')[0]),x=p.join(process.cwd(),u==='/'?'/refactel.html':u);f.readFile(x,(e,d)=>{if(e){s.writeHead(404);return s.end('404')}s.writeHead(200,{'Content-Type':x.endsWith('.html')?'text/html; charset=utf-8':'application/octet-stream'});s.end(d)})}).listen(8000,()=>console.log('http://localhost:8000/refactel.html'))"
+node --% -e "const h=require('http'),f=require('fs'),p=require('path');h.createServer((q,s)=>{const u=decodeURIComponent(q.url.split('?')[0]),x=p.join(process.cwd(),u==='/'?'/daphycel.html':u);f.readFile(x,(e,d)=>{if(e){s.writeHead(404);return s.end('404')}s.writeHead(200,{'Content-Type':x.endsWith('.html')?'text/html; charset=utf-8':'application/octet-stream'});s.end(d)})}).listen(8000,()=>console.log('http://localhost:8000/daphycel.html'))"
 ```
 
-Luego abrir `http://localhost:8000/refactel.html` y `http://localhost:8000/refactel-cliente.html`.
+Luego abrir `http://localhost:8000/daphycel.html` y `http://localhost:8000/daphycel-cliente.html`.
 Con Playwright hay que usar **el mismo `browserContext`** para ambas páginas; de lo contrario no
 comparten `localStorage`.
 
@@ -44,7 +44,7 @@ Todo el estado compartido vive en una sola clave de `localStorage`:
 
 | | |
 |---|---|
-| Clave | `refactel_db_v1` |
+| Clave | `daphycel_db_v1` |
 | Versión | `1` (si `version !== 1` se re-siembra) |
 | Colecciones | `products`, `customers`, `sales`, `repairs`, `users`, `counters`, `caja` |
 
@@ -65,10 +65,10 @@ usan, para que ninguna app borre datos de la otra.
 Disponible en ambos archivos desde la consola del navegador:
 
 ```js
-window.RefacTelDB.KEY      // 'refactel_db_v1'
-window.RefacTelDB.read()   // objeto parseado desde localStorage
-window.RefacTelDB.save()   // fuerza un guardado del estado en memoria
-window.RefacTelDB.reset()  // reescribe la semilla y recarga la página
+window.DaphycelDB.KEY      // 'daphycel_db_v1'
+window.DaphycelDB.read()   // objeto parseado desde localStorage
+window.DaphycelDB.save()   // fuerza un guardado del estado en memoria
+window.DaphycelDB.reset()  // reescribe la semilla y recarga la página
 ```
 
 ## Documentación relacionada

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RefacTel — Refacciones y accesorios de telefonía</title>
+<title>Daphycel — Refacciones y accesorios de telefonía</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
@@ -211,7 +211,7 @@ table.inv tr:hover td{background:var(--surface);}
   <div class="login-card">
     <div class="brand" style="justify-content:center;margin-bottom:6px;">
       <div class="brand-mark">RT</div>
-      <div class="brand-name">RefacTel</div>
+      <div class="brand-name">Daphycel</div>
     </div>
     <p style="color:var(--text-dim);font-size:13px;text-align:center;margin-bottom:18px;">Panel interno · Inicia sesión para continuar</p>
     <div class="field"><label>Usuario</label><input type="text" id="loginUser" placeholder="Ej. dueno"></div>
@@ -228,7 +228,7 @@ table.inv tr:hover td{background:var(--surface);}
   <div class="top-inner">
     <div class="brand">
       <div class="brand-mark">RT</div>
-      <div class="brand-name">RefacTel</div>
+      <div class="brand-name">Daphycel</div>
     </div>
     <nav class="tabs" id="tabNav">
       <button data-view="tienda" class="active">Tienda</button>
@@ -687,9 +687,9 @@ table.inv tr:hover td{background:var(--surface);}
 <script>
 /* ============================================================
    PERSISTENCIA — fuente única compartida (localStorage)
-   Este bloque es idéntico en refactel.html y refactel-cliente.html.
+   Este bloque es idéntico en daphycel.html y daphycel-cliente.html.
 ============================================================ */
-const DB_KEY = 'refactel_db_v1';
+const DB_KEY = 'daphycel_db_v1';
 const DB_VERSION = 1;
 
 const REVIEW_POOL = [
@@ -818,7 +818,7 @@ function reloadFromStore(){
   repairs = fresh.repairs; users = fresh.users; counters = fresh.counters; caja = fresh.caja;
 }
 
-window.RefacTelDB = {
+window.DaphycelDB = {
   KEY: DB_KEY,
   read(){ try{ return JSON.parse(localStorage.getItem(DB_KEY)); }catch(e){ return null; } },
   save(){ saveDB(); },

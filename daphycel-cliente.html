@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RefacTel — Tienda</title>
+<title>Daphycel — Tienda</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
@@ -156,7 +156,7 @@ nav.tabs button.active{background:var(--accent-soft);color:var(--accent);}
   <div class="top-inner">
     <div class="brand">
       <div class="brand-mark">RT</div>
-      <div class="brand-name">RefacTel</div>
+      <div class="brand-name">Daphycel</div>
     </div>
     <nav class="tabs" id="tabNav">
       <button data-view="tienda" data-group="refacciones" class="active">Tienda online</button>
@@ -291,9 +291,9 @@ nav.tabs button.active{background:var(--accent-soft);color:var(--accent);}
 <script>
 /* ============================================================
    PERSISTENCIA — fuente única compartida (localStorage)
-   Este bloque es idéntico en refactel.html y refactel-cliente.html.
+   Este bloque es idéntico en daphycel.html y daphycel-cliente.html.
 ============================================================ */
-const DB_KEY = 'refactel_db_v1';
+const DB_KEY = 'daphycel_db_v1';
 const DB_VERSION = 1;
 
 const REVIEW_POOL = [
@@ -422,7 +422,7 @@ function reloadFromStore(){
   repairs = fresh.repairs; users = fresh.users; counters = fresh.counters; caja = fresh.caja;
 }
 
-window.RefacTelDB = {
+window.DaphycelDB = {
   KEY: DB_KEY,
   read(){ try{ return JSON.parse(localStorage.getItem(DB_KEY)); }catch(e){ return null; } },
   save(){ saveDB(); },

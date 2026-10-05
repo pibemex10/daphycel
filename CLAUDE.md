@@ -1,19 +1,19 @@
-# RefacTel
+# Daphycel
 
 Tienda de refacciones y accesorios de telefonía. Dos aplicaciones web, cada una un único archivo HTML autocontenido.
 
 ## Archivos del proyecto
 
-- **`refactel.html`** — Panel interno del negocio. Requiere login (usuario/contraseña) con 3 roles: `dueno`, `administrador`, `vendedor`, cada uno con permisos distintos. Incluye catálogo, punto de venta (POS) con apertura/cierre de caja, cartera de clientes (crédito/fiado), inventario, panel de estadísticas y gestión de usuarios.
-- **`refactel-cliente.html`** — Tienda pública de cara al cliente final, sin login. Incluye catálogo tipo marketplace (con reseñas y calificación por estrellas), consulta de estado de reparaciones por número de orden, y una sección "Mi cuenta" con búsqueda privada por nombre/número de cliente/orden.
+- **`daphycel.html`** — Panel interno del negocio. Requiere login (usuario/contraseña) con 3 roles: `dueno`, `administrador`, `vendedor`, cada uno con permisos distintos. Incluye catálogo, punto de venta (POS) con apertura/cierre de caja, cartera de clientes (crédito/fiado), inventario, panel de estadísticas y gestión de usuarios.
+- **`daphycel-cliente.html`** — Tienda pública de cara al cliente final, sin login. Incluye catálogo tipo marketplace (con reseñas y calificación por estrellas), consulta de estado de reparaciones por número de orden, y una sección "Mi cuenta" con búsqueda privada por nombre/número de cliente/orden.
 
 ## Stack y convenciones técnicas
 
 - **Vanilla HTML/CSS/JS.** Sin framework, sin bundler, sin build step, sin `package.json` para la app en sí. Cada archivo `.html` es autocontenido: su `<style>` y su `<script>` viven en el mismo archivo.
-- **Sin backend, con fuente única en `localStorage`.** Ambos archivos comparten una sola clave (`refactel_db_v1`) que guarda `products`, `customers`, `sales`, `repairs` (fusión de `repairQueue`/`jobs`), `users`, `counters` y `caja` como JSON. El bloque `seedDB()/loadDB()/saveRaw()/snapshotDB()/saveDB()` es idéntico e inline en ambos archivos (ver detalle completo en `SPEC.md`). Sin sincronización en vivo entre pestañas: los cambios se reflejan al recargar o navegar, última escritura gana. `window.RefacTelDB` expone `read()/save()/reset()` para pruebas.
+- **Sin backend, con fuente única en `localStorage`.** Ambos archivos comparten una sola clave (`daphycel_db_v1`) que guarda `products`, `customers`, `sales`, `repairs` (fusión de `repairQueue`/`jobs`), `users`, `counters` y `caja` como JSON. El bloque `seedDB()/loadDB()/saveRaw()/snapshotDB()/saveDB()` es idéntico e inline en ambos archivos (ver detalle completo en `SPEC.md`). Sin sincronización en vivo entre pestañas: los cambios se reflejan al recargar o navegar, última escritura gana. `window.DaphycelDB` expone `read()/save()/reset()` para pruebas.
 - **Dependencias externas** cargadas por CDN únicamente: Google Fonts (Space Grotesk, IBM Plex Sans, IBM Plex Mono), JsBarcode y qrcodejs vía `cdnjs.cloudflare.com`.
 - **Playwright está instalado globalmente en esta máquina** (`npm install -g playwright`, navegador Chromium) exclusivamente como herramienta de testing para el Evaluator del harness. No es una dependencia del proyecto ni implica que la app necesite Node/npm para funcionar — los archivos `.html` se abren directamente en el navegador (`file://`) o se sirven estáticos.
-- **Paleta azul rey** en ambos archivos, con variantes distintas: `refactel.html` usa fondo crema (`#f8f6f1`) con acento `#3d6fd6`; `refactel-cliente.html` usa fondo blanco con acento `#2540d6`. Mantener esta identidad visual al agregar features.
+- **Paleta azul rey** en ambos archivos, con variantes distintas: `daphycel.html` usa fondo crema (`#f8f6f1`) con acento `#3d6fd6`; `daphycel-cliente.html` usa fondo blanco con acento `#2540d6`. Mantener esta identidad visual al agregar features.
 
 ## Modelo de datos
 

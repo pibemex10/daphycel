@@ -13,9 +13,9 @@ Script de Playwright (`verify.js`) que recorre los 24 criterios de §7 de `SPEC.
 Durante la escritura del script se encontraron y corrigieron **3 bugs del propio script de prueba** (no del código de la app):
 1. Un modal (`#clientModal`) quedaba abierto tras el criterio 9 y su overlay `position:fixed;inset:0` interceptaba clicks de criterios posteriores — causaba timeouts que parecían fallos de la app.
 2. Listeners de diálogo (`alert`/`confirm`) duplicados (uno global + uno local por criterio) competían por aceptar el mismo diálogo nativo, y el segundo lanzaba una excepción no capturada que tumbaba el proceso de Node.
-3. `window.RefacTelDB.reset()` dispara `location.reload()` desde dentro de la página; había que esperar la navegación con `waitForNavigation()` en paralelo al `evaluate()`, no de forma secuencial.
+3. `window.DaphycelDB.reset()` dispara `location.reload()` desde dentro de la página; había que esperar la navegación con `waitForNavigation()` en paralelo al `evaluate()`, no de forma secuencial.
 
-Ningún hallazgo de estos 3 correspondía a un defecto de `refactel.html` / `refactel-cliente.html`.
+Ningún hallazgo de estos 3 correspondía a un defecto de `daphycel.html` / `daphycel-cliente.html`.
 
 ## Resueltos (verificados este pass, ejecutando la app real)
 
