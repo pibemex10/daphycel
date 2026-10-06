@@ -307,6 +307,11 @@ table.inv tr:hover td{background:var(--surface);}
             <label><input type="radio" name="payMethod" value="tarjeta"> Pago con tarjeta</label>
             <label><input type="radio" name="payMethod" value="transferencia"> Otro pago con transferencia</label>
             <label><input type="radio" name="payMethod" value="credito"> Crédito (fiado)</label>
+            <label><input type="radio" name="payMethod" value="entrega"> Paga al entregar equipo</label>
+          </div>
+          <div class="field hidden" id="posRepairRow" style="margin:4px 0 10px;">
+            <label>Equipo en reparación</label>
+            <select id="posRepairSelect"><option value="">Selecciona una orden...</option></select>
           </div>
           <div class="pay-row" id="cashRow">
             <input type="number" id="cashInput" placeholder="Efectivo recibido">
@@ -597,6 +602,24 @@ table.inv tr:hover td{background:var(--surface);}
   </div>
 </div>
 
+<!-- delivery (pago pendiente) charge modal -->
+<div class="modal-bg" id="deliveryChargeModal">
+  <div class="modal" style="width:340px;text-align:left;">
+    <h3>Cobrar pago pendiente</h3>
+    <p class="mono" id="dcInfo" style="color:var(--text-faint);font-size:12px;margin:6px 0 14px;"></p>
+    <div class="cd-row"><span>Monto a cobrar</span><span class="mono" id="dcAmount"></span></div>
+    <div class="pay-method" style="margin-top:10px;">
+      <label><input type="radio" name="dcMethod" value="efectivo" checked> Efectivo</label>
+      <label><input type="radio" name="dcMethod" value="tarjeta"> Tarjeta</label>
+      <label><input type="radio" name="dcMethod" value="transferencia"> Transferencia</label>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-primary" id="dcConfirmBtn" style="flex:1;">Confirmar cobro</button>
+      <button class="btn" id="dcCancelBtn">Después</button>
+    </div>
+  </div>
+</div>
+
 <!-- repair detail modal -->
 <div class="modal-bg" id="repairDetailModal">
   <div class="modal" style="width:320px;text-align:left;">
@@ -848,7 +871,7 @@ async function fetchAll(){
   const sales = saleRes.data.map(s=>({
     id:s.id, items:itemsBySale[s.id]||[], subtotal:Number(s.subtotal), iva:Number(s.iva), total:Number(s.total),
     cash:Number(s.cash), change:Number(s.change_amount), time:fmtHora(s.ts), ts:new Date(s.ts).getTime(),
-    customerId:s.customer_id, method:s.method, tipo:s.tipo, cancelled:s.cancelled,
+    customerId:s.customer_id, method:s.method, tipo:s.tipo, cancelled:s.cancelled, linkedRepairId:s.linked_repair_id,
   }));
   const repairs = repRes.data.map(r=>({
     id:r.id, order:r.order_no, customer:r.customer, customerId:r.customer_id, brand:r.brand, model:r.model, device:r.device,
@@ -911,7 +934,7 @@ window.DaphycelDB = {
   async reset(){ alert('El catálogo ahora vive en una base de datos real (Supabase) — ya no se puede reiniciar desde el navegador. Edítalo desde el panel o directamente en Supabase.'); }
 };
 
-const methodLabel = m => ({efectivo:'Efectivo', tarjeta:'Pago con tarjeta', transferencia:'Transferencia', credito:'Crédito (fiado)', online:'Pedido en línea'}[m] || m);
+const methodLabel = m => ({efectivo:'Efectivo', tarjeta:'Pago con tarjeta', transferencia:'Transferencia', credito:'Crédito (fiado)', entrega:'Paga al entregar equipo', online:'Pedido en línea'}[m] || m);
 
 function showDbError(e){
   console.error(e);
@@ -1255,11 +1278,22 @@ function renderTicket(){
 function getPayMethod(){
   return document.querySelector('input[name="payMethod"]:checked').value;
 }
+function populateRepairSelect(){
+  const sel = document.getElementById('posRepairSelect');
+  const current = sel.value;
+  const abiertos = repairs.filter(r=>r.status!=='Entregado');
+  sel.innerHTML = '<option value="">Selecciona una orden...</option>' +
+    abiertos.map(r=>`<option value="${r.id}">${r.order} · ${r.customer} · ${r.device}</option>`).join('');
+  sel.value = current;
+}
 document.querySelectorAll('input[name="payMethod"]').forEach(r=>r.addEventListener('change', ()=>{
   const method = getPayMethod();
   const needsCash = method==='efectivo';
   document.getElementById('cashRow').classList.toggle('hidden', !needsCash);
   document.getElementById('changeLine').classList.toggle('hidden', !needsCash);
+  const needsRepair = method==='entrega';
+  document.getElementById('posRepairRow').classList.toggle('hidden', !needsRepair);
+  if(needsRepair) populateRepairSelect();
   if(method==='credito' && !document.getElementById('posCustomerSelect').value){
     alert('Selecciona un cliente para registrar la venta a crédito (fiado).');
   }
@@ -1279,9 +1313,12 @@ async function cobrar(){
   const t = ticketTotals();
   const method = getPayMethod();
   const customerId = document.getElementById('posCustomerSelect').value || null;
+  const linkedRepairId = method==='entrega' ? (document.getElementById('posRepairSelect').value || null) : null;
   let cash = 0;
   if(method==='credito'){
     if(!customerId){ alert('Selecciona un cliente para vender a crédito (fiado).'); return; }
+  } else if(method==='entrega'){
+    if(!linkedRepairId){ alert('Selecciona a qué equipo en reparación va ligado este pago pendiente.'); return; }
   } else if(method==='efectivo'){
     cash = parseFloat(document.getElementById('cashInput').value)||0;
     if(cash < t.total){ alert('El efectivo recibido es menor al total.'); return; }
@@ -1299,14 +1336,15 @@ async function cobrar(){
     sbThrow(await sb.rpc('create_sale', {
       p_id:saleId, p_customer_id:customerId, p_method:method, p_tipo:'venta',
       p_subtotal:t.subtotal, p_iva:t.iva, p_total:t.total, p_cash:cash, p_change:change,
-      p_items: items,
+      p_items: items, p_linked_repair_id: linkedRepairId,
     }));
   }catch(e){ cobrarBtn.disabled = false; showDbError(e); return; }
   cobrarBtn.disabled = false;
   await reloadFromStore();
   const sale = sales.find(s=>s.id===saleId);
   showReceipt(sale);
-  ticket = {}; document.getElementById('cashInput').value=''; renderTicket(); renderPosTiles(); renderGrid(); renderInventory(); renderClientes();
+  ticket = {}; document.getElementById('cashInput').value=''; document.getElementById('posRepairSelect').value='';
+  renderTicket(); renderPosTiles(); renderGrid(); renderInventory(); renderClientes(); renderRepairQueue();
 }
 function showReceipt(sale){
   const body = document.getElementById('receiptBody');
@@ -1321,6 +1359,8 @@ function showReceipt(sale){
       <div style="display:flex;justify-content:space-between;font-weight:700;"><span>Total</span><span class="mono">${fmt(sale.total)}</span></div>
       ${sale.method==='credito'
         ? '<div style="display:flex;justify-content:space-between;color:var(--warn);"><span>Cargado a cuenta</span><span class="mono">'+fmt(sale.total)+'</span></div>'
+        : sale.method==='entrega'
+        ? '<div style="display:flex;justify-content:space-between;color:var(--warn);"><span>Pendiente — se cobra al entregar</span><span class="mono">'+fmt(sale.total)+'</span></div>'
         : '<div style="display:flex;justify-content:space-between;color:var(--text-dim);"><span>Efectivo</span><span class="mono">'+fmt(sale.cash)+'</span></div><div style="display:flex;justify-content:space-between;color:var(--accent);"><span>Cambio</span><span class="mono">'+fmt(sale.change)+'</span></div>'}
     </div>`;
   document.getElementById('receiptModal').classList.add('show');
@@ -1380,7 +1420,7 @@ async function cancelSale(saleId){
   if(!confirm('¿Cancelar la venta '+saleId+'? Se repondrá el stock y se revertirá el saldo si fue a crédito.')) return;
   try{ sbThrow(await sb.rpc('cancel_sale', {p_sale_id:saleId})); }catch(e){ showDbError(e); return; }
   await reloadFromStore();
-  renderCancelaciones(); renderGrid(); renderPosTiles(); renderInventory(); renderClientes(); renderPanel();
+  renderCancelaciones(); renderGrid(); renderPosTiles(); renderInventory(); renderClientes(); renderPanel(); renderRepairQueue();
 }
 
 /* ---------- equipos para reparar ---------- */
@@ -1417,11 +1457,19 @@ function resetDeviceBlocks(mode){
 document.querySelectorAll('input[name="rqMode"]').forEach(r=>r.addEventListener('change', e=>resetDeviceBlocks(e.target.value)));
 document.getElementById('rqAddDeviceBlock').addEventListener('click', ()=>addDeviceBlock(true));
 
+function pendingSalesForRepair(repairId){
+  return sales.filter(s=>s.linkedRepairId===repairId && s.method==='entrega' && !s.cancelled);
+}
 function renderRepairQueue(){
   const body = document.getElementById('repairQueueBody');
   if(repairs.length===0){ body.innerHTML = '<tr><td colspan="8" class="empty">No hay equipos registrados.</td></tr>'; return; }
-  body.innerHTML = repairs.map(r=>`
-    <tr>
+  body.innerHTML = repairs.map(r=>{
+    const pendientes = pendingSalesForRepair(r.id);
+    const pendienteTotal = pendientes.reduce((a,s)=>a+s.total,0);
+    const pendienteBtn = (r.status==='Entregado' && pendientes.length>0)
+      ? `<br><button class="btn btn-sm btn-primary" style="margin-top:4px;" data-chargepending="${r.id}">Cobrar pendiente (${fmt(pendienteTotal)})</button>`
+      : (pendientes.length>0 ? `<br><span class="stock-tag low" style="margin-top:4px;display:inline-block;">Pendiente al entregar: ${fmt(pendienteTotal)}</span>` : '');
+    return `<tr>
       <td class="mono">${r.order}</td>
       <td>${r.device}</td>
       <td>${r.customer}</td>
@@ -1432,20 +1480,63 @@ function renderRepairQueue(){
           ${REPAIR_STATUSES.map(st=>`<option value="${st}" ${st===r.status?'selected':''}>${st}</option>`).join('')}
         </select>
       </td>
-      <td>${r.charged ? '<span class="stock-tag ok">Cobrado '+fmt(r.cost)+'</span>' : `<button class="btn btn-sm btn-primary" data-charge="${r.id}">Cobrar</button>`}</td>
+      <td>${r.charged ? '<span class="stock-tag ok">Cobrado '+fmt(r.cost)+'</span>' : `<button class="btn btn-sm btn-primary" data-charge="${r.id}">Cobrar</button>`}${pendienteBtn}</td>
       <td><button class="btn btn-sm" data-detail="${r.id}">Ver detalle</button></td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
   body.querySelectorAll('[data-status]').forEach(sel=>sel.addEventListener('change', async ()=>{
     const r = repairs.find(x=>x.id===sel.dataset.status);
     if(!r) return;
     const prev = r.status; r.status = sel.value;
     try{ sbThrow(await sb.from('repairs').update({status:sel.value}).eq('id', r.id)); }
-    catch(e){ r.status = prev; sel.value = prev; showDbError(e); }
+    catch(e){ r.status = prev; sel.value = prev; showDbError(e); return; }
+    if(sel.value==='Entregado' && pendingSalesForRepair(r.id).length>0){
+      openDeliveryChargeModal(r.id);
+    } else {
+      renderRepairQueue();
+    }
   }));
   body.querySelectorAll('[data-detail]').forEach(b=>b.addEventListener('click', ()=>openRepairDetail(b.dataset.detail)));
   body.querySelectorAll('[data-charge]').forEach(b=>b.addEventListener('click', ()=>openRepairChargeModal(b.dataset.charge)));
+  body.querySelectorAll('[data-chargepending]').forEach(b=>b.addEventListener('click', ()=>openDeliveryChargeModal(b.dataset.chargepending)));
 }
+
+/* ---------- cobro de pagos pendientes ("paga al entregar equipo") ---------- */
+let deliveryChargeRepairId = null;
+function openDeliveryChargeModal(repairId){
+  const r = repairs.find(x=>x.id===repairId);
+  const pendientes = pendingSalesForRepair(repairId);
+  if(!r || pendientes.length===0) return;
+  deliveryChargeRepairId = repairId;
+  const total = pendientes.reduce((a,s)=>a+s.total,0);
+  document.getElementById('dcInfo').textContent = r.order+' · '+r.customer+' · '+r.device+' · '+pendientes.length+' venta(s) pendiente(s) por '+fmt(total);
+  document.querySelector('input[name="dcMethod"][value="efectivo"]').checked = true;
+  document.getElementById('dcAmount').textContent = fmt(total);
+  document.getElementById('deliveryChargeModal').classList.add('show');
+}
+document.getElementById('dcCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('deliveryChargeModal').classList.remove('show');
+  renderRepairQueue();
+});
+document.getElementById('deliveryChargeModal').addEventListener('click', e=>{ if(e.target.id==='deliveryChargeModal'){ e.currentTarget.classList.remove('show'); renderRepairQueue(); } });
+document.getElementById('dcConfirmBtn').addEventListener('click', async ()=>{
+  const pendientes = pendingSalesForRepair(deliveryChargeRepairId);
+  if(pendientes.length===0){ document.getElementById('deliveryChargeModal').classList.remove('show'); return; }
+  const method = document.querySelector('input[name="dcMethod"]:checked').value;
+  const now = new Date().toISOString();
+  const btn = document.getElementById('dcConfirmBtn');
+  btn.disabled = true;
+  try{
+    for(const s of pendientes){
+      sbThrow(await sb.from('sales').update({method, cash:s.total, change_amount:0, ts:now}).eq('id', s.id));
+    }
+  }catch(e){ btn.disabled = false; showDbError(e); return; }
+  btn.disabled = false;
+  document.getElementById('deliveryChargeModal').classList.remove('show');
+  await reloadFromStore();
+  renderRepairQueue(); renderPanel();
+  alert('Pago registrado correctamente ('+methodLabel(method)+').');
+});
 let chargingRepairId = null;
 function openRepairChargeModal(id){
   const r = repairs.find(x=>x.id===id);
