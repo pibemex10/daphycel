@@ -1457,6 +1457,14 @@ function resetDeviceBlocks(mode){
 document.querySelectorAll('input[name="rqMode"]').forEach(r=>r.addEventListener('change', e=>resetDeviceBlocks(e.target.value)));
 document.getElementById('rqAddDeviceBlock').addEventListener('click', ()=>addDeviceBlock(true));
 
+async function copyToClipboard(text){
+  try{
+    await navigator.clipboard.writeText(text);
+    alert('Link copiado:\n'+text);
+  }catch(e){
+    prompt('Copia este link manualmente:', text);
+  }
+}
 function pendingSalesForRepair(repairId){
   return sales.filter(s=>s.linkedRepairId===repairId && s.method==='entrega' && !s.cancelled);
 }
@@ -1481,9 +1489,28 @@ function renderRepairQueue(){
         </select>
       </td>
       <td>${r.charged ? '<span class="stock-tag ok">Cobrado '+fmt(r.cost)+'</span>' : `<button class="btn btn-sm btn-primary" data-charge="${r.id}">Cobrar</button>`}${pendienteBtn}</td>
-      <td><button class="btn btn-sm" data-detail="${r.id}">Ver detalle</button></td>
+      <td><button class="btn btn-sm" data-detail="${r.id}">Ver detalle</button> <button class="btn btn-sm" data-copylink="${r.id}">Copiar link</button>${currentRole==='dueno' ? ` <button class="btn btn-sm btn-danger" data-delrepair="${r.id}">Eliminar</button>` : ''}</td>
     </tr>`;
   }).join('');
+  body.querySelectorAll('[data-copylink]').forEach(b=>b.addEventListener('click', ()=>{
+    const r = repairs.find(x=>x.id===b.dataset.copylink);
+    if(!r) return;
+    const link = new URL('daphycel-cliente.html?orden='+encodeURIComponent(r.order), location.href).toString();
+    copyToClipboard(link);
+  }));
+  body.querySelectorAll('[data-delrepair]').forEach(b=>b.addEventListener('click', async ()=>{
+    const r = repairs.find(x=>x.id===b.dataset.delrepair);
+    if(!r) return;
+    if(!confirm('¿Eliminar el equipo '+r.order+' ('+r.device+' · '+r.customer+')? Esta acción no se puede deshacer.')) return;
+    try{
+      sbThrow(await sb.from('repairs').delete().eq('id', r.id));
+    }catch(e){
+      if(e && e.code==='23503'){ alert('No se puede eliminar: este equipo tiene ventas registradas (cobros de reparación o pagos pendientes ligados).'); return; }
+      showDbError(e); return;
+    }
+    await reloadFromStore();
+    renderRepairQueue();
+  }));
   body.querySelectorAll('[data-status]').forEach(sel=>sel.addEventListener('change', async ()=>{
     const r = repairs.find(x=>x.id===sel.dataset.status);
     if(!r) return;

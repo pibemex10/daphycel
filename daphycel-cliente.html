@@ -790,6 +790,13 @@ document.getElementById('checkoutBtn').addEventListener('click', checkoutOnline)
   renderGrid();
   renderCartBadge();
   renderCartDrawer();
+  // Link directo a una orden (ej. generado desde el panel): ?orden=OR-1234
+  const ordenParam = new URLSearchParams(location.search).get('orden');
+  if(ordenParam){
+    await switchView('trabajos', document.querySelector('#tabNav button[data-view="trabajos"]'));
+    document.getElementById('orderSearchInput').value = ordenParam;
+    searchOrder();
+  }
 })();
 
 </script>
