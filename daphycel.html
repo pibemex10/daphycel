@@ -695,6 +695,10 @@ table.inv tr:hover td{background:var(--surface);}
 <div class="modal-bg" id="clientModal">
   <div class="modal" style="width:360px;">
     <h3 id="cdName">Cliente</h3>
+    <div style="display:flex;gap:8px;margin:8px 0 10px;">
+      <button class="btn btn-sm" id="cdEditBtn">Editar</button>
+      <button class="btn btn-sm btn-danger" id="cdDeleteBtn">Eliminar</button>
+    </div>
     <p class="mono" id="cdPhone" style="color:var(--text-faint);font-size:12px;margin-bottom:10px;"></p>
     <div class="client-detail-body">
       <div class="cd-row"><span>Cliente desde</span><span class="mono" id="cdSince"></span></div>
@@ -703,11 +707,26 @@ table.inv tr:hover td{background:var(--surface);}
       <h3 class="section-title" style="margin-top:16px;font-size:13px;">Historial de compras</h3>
       <div id="cdHistory"></div>
     </div>
-    <div class="abono-row">
+    <div class="abono-row" id="abonoRow">
       <input type="number" id="abonoInput" placeholder="Monto a abonar">
       <button class="btn btn-primary btn-sm" id="abonoBtn">Registrar abono</button>
     </div>
+    <p id="abonoLockedMsg" class="hidden" style="color:var(--text-faint);font-size:12px;margin-top:8px;">No tienes permiso para registrar abonos. El dueño puede dártelo desde Usuarios → Permisos.</p>
     <button class="btn" id="closeClientModal" style="margin-top:12px;width:100%;">Cerrar</button>
+  </div>
+</div>
+
+<!-- editar cliente modal -->
+<div class="modal-bg" id="editClientModal">
+  <div class="modal" style="width:340px;text-align:left;">
+    <h3>Editar cliente</h3>
+    <div class="field"><label>Nombre</label><input type="text" id="ecName"></div>
+    <div class="field"><label>Teléfono</label><input type="text" id="ecPhone"></div>
+    <div class="field"><label>Notas</label><input type="text" id="ecNotes"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-primary" id="ecSaveBtn" style="flex:1;">Guardar</button>
+      <button class="btn" id="ecCancelBtn">Cancelar</button>
+    </div>
   </div>
 </div>
 
@@ -746,6 +765,11 @@ table.inv tr:hover td{background:var(--surface);}
           <td>Cancelar ventas</td>
           <td style="text-align:center;"><input type="checkbox" data-perm="cancelaciones" data-role="administrador"></td>
           <td style="text-align:center;"><input type="checkbox" data-perm="cancelaciones" data-role="vendedor"></td>
+        </tr>
+        <tr>
+          <td>Registrar abonos (cartera de clientes)</td>
+          <td style="text-align:center;"><input type="checkbox" data-perm="abonos" data-role="administrador"></td>
+          <td style="text-align:center;"><input type="checkbox" data-perm="abonos" data-role="vendedor"></td>
         </tr>
       </tbody>
     </table>
@@ -863,8 +887,8 @@ async function fetchAll(){
    antes de que el dueño pudiera configurarlos): el dueño siempre tiene todo. */
 function defaultRolePermissions(){
   return {
-    administrador: {inventario:true, panel:false, cancelaciones:true},
-    vendedor: {inventario:false, panel:false, cancelaciones:false},
+    administrador: {inventario:true, panel:false, cancelaciones:true, abonos:true},
+    vendedor: {inventario:false, panel:false, cancelaciones:false, abonos:false},
   };
 }
 function hasPerm(key){
@@ -1784,6 +1808,9 @@ function openClientModal(id){
     ? '<div class="empty" style="padding:20px 0;">Sin compras registradas.</div>'
     : hist.map(s=>`<div class="cd-history-item"><span>${s.id} · ${s.items.length} artículo(s)<br><span class="s-time">${s.time} · ${methodLabel(s.method)}</span></span><span class="mono">${fmt(s.total)}</span></div>`).join('');
   document.getElementById('abonoInput').value = '';
+  const canAbonar = hasPerm('abonos');
+  document.getElementById('abonoRow').classList.toggle('hidden', !canAbonar);
+  document.getElementById('abonoLockedMsg').classList.toggle('hidden', canAbonar);
   document.getElementById('clientModal').classList.add('show');
 }
 document.getElementById('closeClientModal').addEventListener('click', ()=>document.getElementById('clientModal').classList.remove('show'));
@@ -1791,11 +1818,52 @@ document.getElementById('clientModal').addEventListener('click', e=>{ if(e.targe
 document.getElementById('abonoBtn').addEventListener('click', async ()=>{
   const c = customers.find(x=>x.id===activeClientId);
   if(!c) return;
+  if(!hasPerm('abonos')){ alert('No tienes permiso para registrar abonos.'); return; }
   const amount = parseFloat(document.getElementById('abonoInput').value);
   if(isNaN(amount) || amount<=0){ alert('Ingresa un monto válido a abonar.'); return; }
   try{ sbThrow(await sb.rpc('abonar', {p_customer_id:c.id, p_amount:amount})); }catch(e){ showDbError(e); return; }
   await reloadFromStore();
   openClientModal(c.id);
+  renderClientes();
+});
+
+/* ---------- editar / eliminar cliente (disponible para cualquier rol) ---------- */
+document.getElementById('cdEditBtn').addEventListener('click', ()=>{
+  const c = customers.find(x=>x.id===activeClientId);
+  if(!c) return;
+  document.getElementById('ecName').value = c.name;
+  document.getElementById('ecPhone').value = c.phone || '';
+  document.getElementById('ecNotes').value = c.notes || '';
+  document.getElementById('editClientModal').classList.add('show');
+});
+document.getElementById('ecCancelBtn').addEventListener('click', ()=>document.getElementById('editClientModal').classList.remove('show'));
+document.getElementById('editClientModal').addEventListener('click', e=>{ if(e.target.id==='editClientModal') e.currentTarget.classList.remove('show'); });
+document.getElementById('ecSaveBtn').addEventListener('click', async ()=>{
+  const c = customers.find(x=>x.id===activeClientId);
+  if(!c) return;
+  const name = document.getElementById('ecName').value.trim();
+  const phone = document.getElementById('ecPhone').value.trim();
+  const notes = document.getElementById('ecNotes').value.trim();
+  if(!name){ alert('El nombre del cliente es obligatorio.'); return; }
+  try{ sbThrow(await sb.from('customers').update({name, phone, notes}).eq('id', c.id)); }catch(e){ showDbError(e); return; }
+  await reloadFromStore();
+  document.getElementById('editClientModal').classList.remove('show');
+  openClientModal(c.id);
+  renderClientes();
+});
+document.getElementById('cdDeleteBtn').addEventListener('click', async ()=>{
+  const c = customers.find(x=>x.id===activeClientId);
+  if(!c) return;
+  const warnBalance = c.balance>0 ? ' Tiene un saldo pendiente de '+fmt(c.balance)+' que se perderá.' : '';
+  if(!confirm('¿Eliminar al cliente "'+c.name+'"?'+warnBalance)) return;
+  try{
+    sbThrow(await sb.from('customers').delete().eq('id', c.id));
+  }catch(e){
+    if(e && e.code==='23503'){ alert('No se puede eliminar: este cliente tiene ventas o equipos en reparación registrados a su nombre.'); return; }
+    showDbError(e); return;
+  }
+  document.getElementById('clientModal').classList.remove('show');
+  await reloadFromStore();
   renderClientes();
 });
 
