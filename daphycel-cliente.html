@@ -357,7 +357,7 @@ async function fetchAll(){
   const itemsBySale = {};
   itemRes.data.forEach(it=>{ (itemsBySale[it.sale_id] ||= []).push({sku:it.sku, name:it.name, qty:it.qty, price:Number(it.price)}); });
 
-  const products = prodRes.data.map(p=>({sku:p.sku, name:p.name, cat:p.cat, subcat:p.subcat, price:Number(p.price), stock:p.stock, desc:p.description||'', image_url:p.image_url||null, reviews:reviewsBySku[p.sku]||[]}));
+  const products = prodRes.data.map(p=>({sku:p.sku, name:p.name, cat:p.cat, subcat:p.subcat, price:Number(p.price), stock:p.stock, desc:p.description||'', image_url:p.image_url||null, barcode:p.barcode||'', reviews:reviewsBySku[p.sku]||[]}));
   const customers = custRes.data.map(c=>({id:c.id, name:c.name, phone:c.phone||'', notes:c.notes||'', since:fmtFecha(c.since), balance:Number(c.balance)}));
   const sales = saleRes.data.map(s=>({
     id:s.id, items:itemsBySale[s.id]||[], subtotal:Number(s.subtotal), iva:Number(s.iva), total:Number(s.total),

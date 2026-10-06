@@ -418,7 +418,8 @@ table.inv tr:hover td{background:var(--surface);}
         <h3 class="section-title">Nuevo producto</h3>
         <div class="form-grid">
           <div class="field"><label>Nombre</label><input type="text" id="fName" placeholder="Ej. Pantalla iPhone 11"></div>
-          <div class="field"><label>SKU</label><input type="text" id="fSku" placeholder="Ej. PANT-020"></div>
+          <div class="field"><label>Número de producto (automático)</label><input type="text" id="fNumPreview" disabled style="color:var(--text-dim);background:var(--surface-2);"></div>
+          <div class="field"><label>Código de producto <span style="color:var(--text-faint);font-weight:400;">(escanéalo con el lector)</span></label><input type="text" id="fBarcode" placeholder="Escanea aquí o escribe el código"></div>
           <div class="field"><label>Categoría</label>
             <select id="fCat">
               <option value="pantallas">Pantallas</option>
@@ -611,7 +612,8 @@ table.inv tr:hover td{background:var(--surface);}
     <h3>Editar producto</h3>
     <div class="form-grid wide" style="margin-top:14px;">
       <div class="field"><label>Nombre</label><input type="text" id="eName"></div>
-      <div class="field"><label>SKU</label><input type="text" id="eSku"></div>
+      <div class="field"><label>Número de producto</label><input type="text" id="eSku"></div>
+      <div class="field wide" style="grid-column:1/-1;"><label>Código de producto <span style="color:var(--text-faint);font-weight:400;">(escáner)</span></label><input type="text" id="eBarcode" placeholder="Escanea aquí o escribe el código"></div>
       <div class="field"><label>Categoría</label>
         <select id="eCat">
           <option value="pantallas">Pantallas</option>
@@ -779,7 +781,7 @@ async function fetchAll(){
   const itemsBySale = {};
   itemRes.data.forEach(it=>{ (itemsBySale[it.sale_id] ||= []).push({sku:it.sku, name:it.name, qty:it.qty, price:Number(it.price)}); });
 
-  const products = prodRes.data.map(p=>({sku:p.sku, name:p.name, cat:p.cat, subcat:p.subcat, price:Number(p.price), stock:p.stock, desc:p.description||'', image_url:p.image_url||null, reviews:reviewsBySku[p.sku]||[]}));
+  const products = prodRes.data.map(p=>({sku:p.sku, name:p.name, cat:p.cat, subcat:p.subcat, price:Number(p.price), stock:p.stock, desc:p.description||'', image_url:p.image_url||null, barcode:p.barcode||'', reviews:reviewsBySku[p.sku]||[]}));
   const customers = custRes.data.map(c=>({id:c.id, name:c.name, phone:c.phone||'', notes:c.notes||'', since:fmtFecha(c.since), balance:Number(c.balance)}));
   const sales = saleRes.data.map(s=>({
     id:s.id, items:itemsBySale[s.id]||[], subtotal:Number(s.subtotal), iva:Number(s.iva), total:Number(s.total),
@@ -1436,7 +1438,9 @@ document.querySelectorAll('#invSubNav .chip').forEach(chip=>{
     renderInventory();
   });
 });
+const formatNumProducto = n => 'DPC-' + String(n).padStart(8,'0');
 function renderInventory(){
+  if(activeInvSub==='agregar') document.getElementById('fNumPreview').value = formatNumProducto((counters.producto||0) + 1);
   if(activeInvSub==='editar') renderInvTable('invEditBody', 'editar');
   if(activeInvSub==='borrar') renderInvTable('invDeleteBody', 'borrar');
   if(activeInvSub==='fotos') renderInvFotos();
@@ -1552,27 +1556,28 @@ function resetPhotoField(){
 }
 document.getElementById('saveProduct').addEventListener('click', async ()=>{
   const name = document.getElementById('fName').value.trim();
-  const sku = document.getElementById('fSku').value.trim();
+  const barcode = document.getElementById('fBarcode').value.trim();
   const cat = document.getElementById('fCat').value;
   const price = parseFloat(document.getElementById('fPrice').value);
   const stock = parseInt(document.getElementById('fStock').value);
   const desc = document.getElementById('fDesc').value.trim();
-  if(!name || !sku || isNaN(price) || isNaN(stock)){ alert('Completa todos los campos correctamente.'); return; }
-  if(products.some(p=>p.sku.toLowerCase()===sku.toLowerCase())){ alert('Ya existe un producto con ese SKU.'); return; }
+  if(!name || isNaN(price) || isNaN(stock)){ alert('Completa todos los campos correctamente.'); return; }
   const saveBtn = document.getElementById('saveProduct');
   saveBtn.disabled = true;
   const prevText = saveBtn.textContent;
   try{
+    const num = sbThrow(await sb.rpc('increment_counter', {p_key:'producto'}));
+    const sku = formatNumProducto(num);
     let image_url = null;
     if(pendingPhotoFile){
       saveBtn.textContent = 'Subiendo foto...';
       image_url = await uploadPhotoFile(sku, pendingPhotoFile);
     }
-    sbThrow(await sb.from('products').insert({sku, name, cat, subcat:null, price, stock, description:desc, image_url}));
+    sbThrow(await sb.from('products').insert({sku, name, cat, subcat:null, price, stock, description:desc, image_url, barcode: barcode || null}));
   }catch(e){ saveBtn.disabled = false; saveBtn.textContent = prevText; showDbError(e); return; }
   saveBtn.disabled = false; saveBtn.textContent = prevText;
   await reloadFromStore();
-  ['fName','fSku','fPrice','fStock','fDesc'].forEach(id=>document.getElementById(id).value='');
+  ['fName','fBarcode','fPrice','fStock','fDesc'].forEach(id=>document.getElementById(id).value='');
   resetPhotoField();
   alert('Producto agregado correctamente.');
   renderInventory(); renderGrid(); renderPosTiles(); renderChips();
@@ -1590,6 +1595,7 @@ function openEditModal(sku){
   document.getElementById('ePrice').value = p.price;
   document.getElementById('eStock').value = p.stock;
   document.getElementById('eDesc').value = p.desc || '';
+  document.getElementById('eBarcode').value = p.barcode || '';
   document.getElementById('editModal').classList.add('show');
 }
 document.getElementById('closeEditModal').addEventListener('click', ()=>document.getElementById('editModal').classList.remove('show'));
@@ -1603,10 +1609,11 @@ document.getElementById('saveEditBtn').addEventListener('click', async ()=>{
   const price = parseFloat(document.getElementById('ePrice').value);
   const stock = parseInt(document.getElementById('eStock').value);
   const desc = document.getElementById('eDesc').value.trim();
+  const barcode = document.getElementById('eBarcode').value.trim();
   if(!name || !sku || isNaN(price) || isNaN(stock)){ alert('Completa todos los campos correctamente.'); return; }
-  if(sku.toLowerCase()!==p.sku.toLowerCase() && products.some(x=>x.sku.toLowerCase()===sku.toLowerCase())){ alert('Ya existe otro producto con ese SKU.'); return; }
+  if(sku.toLowerCase()!==p.sku.toLowerCase() && products.some(x=>x.sku.toLowerCase()===sku.toLowerCase())){ alert('Ya existe otro producto con ese número.'); return; }
   // subcat y reviews del producto se conservan solas: no se tocan esas columnas/tabla al editar.
-  try{ sbThrow(await sb.from('products').update({sku, name, cat, price, stock, description:desc}).eq('sku', p.sku)); }catch(e){ showDbError(e); return; }
+  try{ sbThrow(await sb.from('products').update({sku, name, cat, price, stock, description:desc, barcode: barcode || null}).eq('sku', p.sku)); }catch(e){ showDbError(e); return; }
   await reloadFromStore();
   document.getElementById('editModal').classList.remove('show');
   renderInventory(); renderGrid(); renderPosTiles(); renderChips();
