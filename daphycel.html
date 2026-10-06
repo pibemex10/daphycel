@@ -433,6 +433,15 @@ table.inv tr:hover td{background:var(--surface);}
           </div>
           <div class="field"><label>Precio (MXN)</label><input type="number" id="fPrice" placeholder="0.00"></div>
           <div class="field"><label>Stock inicial</label><input type="number" id="fStock" placeholder="0"></div>
+          <div class="field wide" style="grid-column:1/-1;">
+            <label>Foto (opcional, se muestra en la tienda)</label>
+            <input type="file" accept="image/*" id="fPhoto" class="hidden">
+            <div style="display:flex;align-items:center;gap:10px;margin-top:2px;">
+              <button type="button" class="btn btn-sm" id="fPhotoBtn">Cargar foto</button>
+              <img id="fPhotoPreview" class="hidden" style="width:36px;height:36px;object-fit:cover;border-radius:7px;border:1px solid var(--border);">
+              <span id="fPhotoName" style="font-size:12.5px;color:var(--text-faint);">Ningún archivo seleccionado</span>
+            </div>
+          </div>
           <div class="field wide" style="grid-column:1/-1;"><label>Descripción (opcional, se muestra en la tienda)</label><input type="text" id="fDesc" placeholder="Ej. Pantalla OLED compatible, incluye digitalizador"></div>
         </div>
         <div style="display:flex;gap:10px;margin-top:16px;">
@@ -1459,17 +1468,27 @@ function renderInvFotos(){
     await uploadProductPhoto(inp.dataset.photoInput, file);
   }));
 }
+/* Validacion y subida compartidas: las usan tanto la pestaña Fotos (producto ya
+   existente) como el campo de foto del formulario "Nuevo producto" (abajo). */
+function validatePhotoFile(file){
+  if(!file.type.startsWith('image/')){ alert('Elige un archivo de imagen.'); return false; }
+  if(file.size > 5*1024*1024){ alert('La imagen pesa más de 5 MB — elige una más ligera.'); return false; }
+  return true;
+}
+async function uploadPhotoFile(sku, file){
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+  const path = `${sku}-${Date.now()}.${ext}`;
+  sbThrow(await sb.storage.from('product-images').upload(path, file, {upsert:true, contentType:file.type}));
+  const { data:{ publicUrl } } = sb.storage.from('product-images').getPublicUrl(path);
+  return publicUrl;
+}
 async function uploadProductPhoto(sku, file){
-  if(!file.type.startsWith('image/')){ alert('Elige un archivo de imagen.'); return; }
-  if(file.size > 5*1024*1024){ alert('La imagen pesa más de 5 MB — elige una más ligera.'); return; }
+  if(!validatePhotoFile(file)) return;
   const btn = document.querySelector(`#invFotosBody [data-photo-btn="${sku}"]`);
   const prevText = btn ? btn.textContent : '';
   if(btn){ btn.disabled = true; btn.textContent = 'Subiendo...'; }
   try{
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
-    const path = `${sku}-${Date.now()}.${ext}`;
-    sbThrow(await sb.storage.from('product-images').upload(path, file, {upsert:true, contentType:file.type}));
-    const { data:{ publicUrl } } = sb.storage.from('product-images').getPublicUrl(path);
+    const publicUrl = await uploadPhotoFile(sku, file);
     sbThrow(await sb.from('products').update({image_url:publicUrl}).eq('sku', sku));
     await reloadFromStore();
     renderInvFotos();
@@ -1508,6 +1527,29 @@ function renderInvTable(tbodyId, mode){
     }));
   }
 }
+let pendingPhotoFile = null;
+document.getElementById('fPhotoBtn').addEventListener('click', ()=>document.getElementById('fPhoto').click());
+document.getElementById('fPhoto').addEventListener('change', ()=>{
+  const file = document.getElementById('fPhoto').files[0];
+  if(!file) return;
+  if(!validatePhotoFile(file)){ document.getElementById('fPhoto').value=''; return; }
+  pendingPhotoFile = file;
+  document.getElementById('fPhotoName').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const img = document.getElementById('fPhotoPreview');
+    img.src = reader.result;
+    img.classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+});
+function resetPhotoField(){
+  pendingPhotoFile = null;
+  document.getElementById('fPhoto').value = '';
+  document.getElementById('fPhotoName').textContent = 'Ningún archivo seleccionado';
+  const prev = document.getElementById('fPhotoPreview');
+  prev.classList.add('hidden'); prev.src = '';
+}
 document.getElementById('saveProduct').addEventListener('click', async ()=>{
   const name = document.getElementById('fName').value.trim();
   const sku = document.getElementById('fSku').value.trim();
@@ -1517,9 +1559,21 @@ document.getElementById('saveProduct').addEventListener('click', async ()=>{
   const desc = document.getElementById('fDesc').value.trim();
   if(!name || !sku || isNaN(price) || isNaN(stock)){ alert('Completa todos los campos correctamente.'); return; }
   if(products.some(p=>p.sku.toLowerCase()===sku.toLowerCase())){ alert('Ya existe un producto con ese SKU.'); return; }
-  try{ sbThrow(await sb.from('products').insert({sku, name, cat, subcat:null, price, stock, description:desc})); }catch(e){ showDbError(e); return; }
+  const saveBtn = document.getElementById('saveProduct');
+  saveBtn.disabled = true;
+  const prevText = saveBtn.textContent;
+  try{
+    let image_url = null;
+    if(pendingPhotoFile){
+      saveBtn.textContent = 'Subiendo foto...';
+      image_url = await uploadPhotoFile(sku, pendingPhotoFile);
+    }
+    sbThrow(await sb.from('products').insert({sku, name, cat, subcat:null, price, stock, description:desc, image_url}));
+  }catch(e){ saveBtn.disabled = false; saveBtn.textContent = prevText; showDbError(e); return; }
+  saveBtn.disabled = false; saveBtn.textContent = prevText;
   await reloadFromStore();
   ['fName','fSku','fPrice','fStock','fDesc'].forEach(id=>document.getElementById(id).value='');
+  resetPhotoField();
   alert('Producto agregado correctamente.');
   renderInventory(); renderGrid(); renderPosTiles(); renderChips();
 });
