@@ -36,6 +36,7 @@ Playwright, por comodidad de navegación, no por requisito de origen.
    - `supabase-schema-2.sql` — funciones atómicas (`create_sale`, `cancel_sale`, `abonar`, `increment_counter`).
    - `supabase-schema-3.sql` — columna `products.image_url` y bucket público `product-images` (fotos de producto).
    - `supabase-schema-4.sql` — columna `products.barcode` y el contador `producto` (número de producto automático `DPC-########`).
+   - `supabase-schema-5.sql` — fila `role_permissions` en `settings` (permisos configurables para administrador/vendedor).
 3. Copiar el **Project URL** y la clave **`anon` / `publishable`** (nunca la `service_role`) a las
    constantes `SUPABASE_URL` / `SUPABASE_KEY` al inicio del bloque `PERSISTENCIA` de **ambos** archivos.
 4. Sembrar el catálogo/clientes/ventas/reparaciones de ejemplo (no hay script en el repo; se hizo con
@@ -105,4 +106,4 @@ no tenga el inicio de sesión del equipo forzado para producción (`sso_login_co
 - `SPEC.md` / `FINDINGS.md` — especificación y verificación de la **primera** versión del modelo de
   datos unificado sobre `localStorage` (septiembre 2026) — contexto histórico, ya superado por la
   migración a Supabase de octubre 2026.
-- `supabase-schema.sql`, `supabase-schema-2.sql`, `supabase-schema-3.sql`, `supabase-schema-4.sql` — esquema completo de la base de datos.
+- `supabase-schema.sql`, `supabase-schema-2.sql`, `supabase-schema-3.sql`, `supabase-schema-4.sql`, `supabase-schema-5.sql` — esquema completo de la base de datos.

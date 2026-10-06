@@ -278,6 +278,7 @@ table.inv tr:hover td{background:var(--surface);}
     </div>
 
     <div class="chip-row" id="posSubNav">
+      <button class="chip" id="posPanelBtn" type="button">Panel</button>
       <button class="chip active" data-sub="venta">Venta</button>
       <button class="chip" data-sub="cancelaciones">Cancelaciones</button>
       <button class="chip" data-sub="equipos">Equipos para reparar</button>
@@ -322,7 +323,7 @@ table.inv tr:hover td{background:var(--surface);}
     <div id="posSubCancelaciones" class="hidden">
       <div id="cancelLocked" class="locked-msg hidden">
         <h3>🔒 Acceso restringido</h3>
-        <p>Solo el dueño o un administrador pueden cancelar ventas.<br>Cambia de rol arriba para continuar.</p>
+        <p>No tienes permiso para cancelar ventas.<br>El dueño puede dártelo desde Usuarios → Permisos.</p>
       </div>
       <div class="inv-table-wrap card" id="cancelContent">
         <table class="inv">
@@ -487,7 +488,7 @@ table.inv tr:hover td{background:var(--surface);}
   <section class="view hidden" id="view-panel">
     <div id="panelLocked" class="locked-msg hidden">
       <h3>🔒 Acceso restringido</h3>
-      <p>El panel general solo está disponible para el dueño.<br>Cambia de rol arriba para continuar.</p>
+      <p>No tienes permiso para ver el panel de estadísticas.<br>El dueño puede dártelo desde Usuarios → Permisos.</p>
     </div>
     <div id="panelContent">
       <div class="page-head">
@@ -532,6 +533,12 @@ table.inv tr:hover td{background:var(--surface);}
         <div class="field"><label>Correo</label><input type="email" id="notifyEmailInput" placeholder="Ej. dueno@tutienda.com"></div>
       </div>
       <button class="btn btn-primary" id="saveNotifyEmailBtn" style="margin-top:10px;">Guardar correo</button>
+    </div>
+
+    <div class="card" style="padding:18px;margin-bottom:22px;">
+      <h3 class="section-title">Permisos por rol</h3>
+      <p style="color:var(--text-dim);font-size:12.5px;margin-bottom:10px;">El dueño siempre puede hacer todo. Elige qué puede hacer cada rol — se aplica a todas las cuentas de administrador y de vendedor.</p>
+      <button class="btn" id="openPermsBtn">Configurar permisos</button>
     </div>
 
     <div class="card" style="padding:18px;margin-bottom:22px;">
@@ -718,6 +725,38 @@ table.inv tr:hover td{background:var(--surface);}
   </div>
 </div>
 
+<!-- permisos por rol modal -->
+<div class="modal-bg" id="permsModal">
+  <div class="modal" style="width:400px;text-align:left;">
+    <h3>Permisos por rol</h3>
+    <p style="color:var(--text-faint);font-size:12px;margin:6px 0 14px;">El dueño siempre puede hacer todo. Marca lo que puede hacer cada rol.</p>
+    <table class="inv" style="width:100%;">
+      <thead><tr><th>Permiso</th><th style="text-align:center;">Administrador</th><th style="text-align:center;">Vendedor</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Editar / borrar mercancía</td>
+          <td style="text-align:center;"><input type="checkbox" data-perm="inventario" data-role="administrador"></td>
+          <td style="text-align:center;"><input type="checkbox" data-perm="inventario" data-role="vendedor"></td>
+        </tr>
+        <tr>
+          <td>Ver panel de estadísticas</td>
+          <td style="text-align:center;"><input type="checkbox" data-perm="panel" data-role="administrador"></td>
+          <td style="text-align:center;"><input type="checkbox" data-perm="panel" data-role="vendedor"></td>
+        </tr>
+        <tr>
+          <td>Cancelar ventas</td>
+          <td style="text-align:center;"><input type="checkbox" data-perm="cancelaciones" data-role="administrador"></td>
+          <td style="text-align:center;"><input type="checkbox" data-perm="cancelaciones" data-role="vendedor"></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-primary" id="permsConfirmBtn" style="flex:1;">Guardar</button>
+      <button class="btn" id="permsCancelBtn">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- receipt modal -->
 <div class="modal-bg" id="receiptModal">
   <div class="modal" style="width:300px;">
@@ -806,11 +845,34 @@ async function fetchAll(){
     ? {abierta:cajaRes.data.abierta, montoInicial:Number(cajaRes.data.monto_inicial), aperturaHora:cajaRes.data.apertura_hora, aperturaTs:aperturaTsVal, cortes}
     : {abierta:false, montoInicial:0, aperturaHora:null, aperturaTs:null, cortes};
   const notifyEmail = (settingRes.data.find(s=>s.key==='notify_email')||{}).value || '';
+  let rolePermissions = defaultRolePermissions();
+  try{
+    const raw = (settingRes.data.find(s=>s.key==='role_permissions')||{}).value;
+    if(raw){
+      const parsed = JSON.parse(raw);
+      rolePermissions = {
+        administrador: {...defaultRolePermissions().administrador, ...(parsed.administrador||{})},
+        vendedor: {...defaultRolePermissions().vendedor, ...(parsed.vendedor||{})},
+      };
+    }
+  }catch(e){ rolePermissions = defaultRolePermissions(); }
 
-  return {products, customers, sales, repairs, users, counters, caja, notifyEmail};
+  return {products, customers, sales, repairs, users, counters, caja, notifyEmail, rolePermissions};
 }
 
-let products=[], customers=[], sales=[], repairs=[], users=[], counters={}, caja={abierta:false,montoInicial:0,aperturaHora:null,aperturaTs:null,cortes:[]}, notifyEmail='';
+/* Permisos por rol por defecto (igual al comportamiento fijo que tenía la app
+   antes de que el dueño pudiera configurarlos): el dueño siempre tiene todo. */
+function defaultRolePermissions(){
+  return {
+    administrador: {inventario:true, panel:false, cancelaciones:true},
+    vendedor: {inventario:false, panel:false, cancelaciones:false},
+  };
+}
+function hasPerm(key){
+  return currentRole==='dueno' || !!(rolePermissions[currentRole] && rolePermissions[currentRole][key]);
+}
+
+let products=[], customers=[], sales=[], repairs=[], users=[], counters={}, caja={abierta:false,montoInicial:0,aperturaHora:null,aperturaTs:null,cortes:[]}, notifyEmail='', rolePermissions=defaultRolePermissions();
 
 /* Re-lee el store al navegar entre vistas: evita que una copia vieja en memoria
    pise lo que la otra app (o el servidor) haya escrito mientras tanto. */
@@ -818,6 +880,7 @@ async function reloadFromStore(){
   const fresh = await fetchAll();
   products=fresh.products; customers=fresh.customers; sales=fresh.sales; repairs=fresh.repairs;
   users=fresh.users; counters=fresh.counters; caja=fresh.caja; notifyEmail=fresh.notifyEmail;
+  rolePermissions=fresh.rolePermissions;
 }
 
 window.DaphycelDB = {
@@ -931,8 +994,8 @@ document.getElementById('logoutBtn').addEventListener('click', ()=>{
 function applyRoleLocks(){
   const panelLocked = document.getElementById('panelLocked');
   const panelContent = document.getElementById('panelContent');
-  const canManageInventory = currentRole==='dueno' || currentRole==='administrador';
-  const canSeePanel = currentRole==='dueno';
+  const canManageInventory = hasPerm('inventario');
+  const canSeePanel = hasPerm('panel');
   document.getElementById('invTabEditar').classList.toggle('hidden', !canManageInventory);
   document.getElementById('invTabBorrar').classList.toggle('hidden', !canManageInventory);
   if(!canManageInventory && (activeInvSub==='editar' || activeInvSub==='borrar')){
@@ -1006,6 +1069,26 @@ document.getElementById('saveNotifyEmailBtn').addEventListener('click', async ()
   try{ sbThrow(await sb.from('settings').upsert({key:'notify_email', value}, {onConflict:'key'})); }catch(e){ showDbError(e); return; }
   notifyEmail = value;
   alert(notifyEmail ? 'Correo de notificaciones guardado: '+notifyEmail : 'Correo de notificaciones eliminado. No se enviarán avisos.');
+});
+
+/* ---------- permisos por rol (solo dueño) ---------- */
+function openPermsModal(){
+  document.querySelectorAll('#permsModal [data-perm]').forEach(cb=>{
+    cb.checked = !!(rolePermissions[cb.dataset.role] && rolePermissions[cb.dataset.role][cb.dataset.perm]);
+  });
+  document.getElementById('permsModal').classList.add('show');
+}
+document.getElementById('openPermsBtn').addEventListener('click', openPermsModal);
+document.getElementById('permsCancelBtn').addEventListener('click', ()=>document.getElementById('permsModal').classList.remove('show'));
+document.getElementById('permsModal').addEventListener('click', e=>{ if(e.target.id==='permsModal') e.currentTarget.classList.remove('show'); });
+document.getElementById('permsConfirmBtn').addEventListener('click', async ()=>{
+  const next = {administrador:{}, vendedor:{}};
+  document.querySelectorAll('#permsModal [data-perm]').forEach(cb=>{ next[cb.dataset.role][cb.dataset.perm] = cb.checked; });
+  try{ sbThrow(await sb.from('settings').upsert({key:'role_permissions', value:JSON.stringify(next)}, {onConflict:'key'})); }catch(e){ showDbError(e); return; }
+  rolePermissions = next;
+  document.getElementById('permsModal').classList.remove('show');
+  applyRoleLocks();
+  alert('Permisos actualizados correctamente.');
 });
 function renderPanelUsers(){
   const box = document.getElementById('panelUsersList');
@@ -1224,19 +1307,20 @@ function showReceipt(sale){
    POS — submenú (Venta / Cancelaciones / Equipos para reparar)
 ============================================================ */
 let activePosSub = 'venta';
-document.querySelectorAll('#posSubNav .chip').forEach(chip=>{
+document.querySelectorAll('#posSubNav .chip[data-sub]').forEach(chip=>{
   chip.addEventListener('click', async ()=>{
     try{ await reloadFromStore(); }catch(e){ showDbError(e); return; }
     activePosSub = chip.dataset.sub;
-    document.querySelectorAll('#posSubNav .chip').forEach(c=>c.classList.toggle('active', c===chip));
+    document.querySelectorAll('#posSubNav .chip[data-sub]').forEach(c=>c.classList.toggle('active', c===chip));
     document.getElementById('posSubVenta').classList.toggle('hidden', activePosSub!=='venta');
     document.getElementById('posSubCancelaciones').classList.toggle('hidden', activePosSub!=='cancelaciones');
     document.getElementById('posSubEquipos').classList.toggle('hidden', activePosSub!=='equipos');
     renderPosSub();
   });
 });
+document.getElementById('posPanelBtn').addEventListener('click', ()=>switchView('panel'));
 function renderPosSub(){
-  const canCancel = currentRole==='dueno' || currentRole==='administrador';
+  const canCancel = hasPerm('cancelaciones');
   document.getElementById('cancelLocked').classList.toggle('hidden', canCancel);
   document.getElementById('cancelContent').classList.toggle('hidden', !canCancel);
   if(activePosSub==='cancelaciones' && canCancel) renderCancelaciones();
@@ -1264,8 +1348,8 @@ function renderCancelaciones(){
   body.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click', ()=>cancelSale(b.dataset.cancel)));
 }
 async function cancelSale(saleId){
-  if(currentRole!=='dueno' && currentRole!=='administrador'){
-    alert('No tienes permiso para cancelar ventas. Solo el dueño o un administrador pueden hacerlo.');
+  if(!hasPerm('cancelaciones')){
+    alert('No tienes permiso para cancelar ventas. Pide al dueño que te dé acceso desde Usuarios → Permisos.');
     return;
   }
   const sale = sales.find(s=>s.id===saleId);
