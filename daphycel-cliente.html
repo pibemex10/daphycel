@@ -646,16 +646,18 @@ function searchOrder(){
   const query = document.getElementById('orderSearchInput').value.trim();
   const grid = document.getElementById('jobsGrid');
   if(!query){ grid.innerHTML = '<div class="empty">Ingresa tu número de orden para ver el estado de tu reparación.</div>'; return; }
-  const job = repairs.find(r=>r.order && r.order.toLowerCase()===query.toLowerCase());
-  if(!job){ grid.innerHTML = '<div class="empty">No encontramos ninguna orden con ese número. Verifica e intenta de nuevo.</div>'; return; }
-  grid.innerHTML = `
+  // Varios equipos registrados juntos comparten el mismo numero de orden,
+  // asi que una orden puede traer mas de un equipo.
+  const jobs = repairs.filter(r=>r.order && r.order.toLowerCase()===query.toLowerCase());
+  if(jobs.length===0){ grid.innerHTML = '<div class="empty">No encontramos ninguna orden con ese número. Verifica e intenta de nuevo.</div>'; return; }
+  grid.innerHTML = jobs.map(job => `
     <div class="job-card">
       <span class="job-status">${job.status}</span>
       <div class="job-device">${job.device}</div>
       <div class="job-issue">${job.work}</div>
       <div class="job-meta"><span class="mono">${job.order}</span><span class="mono">${job.received} · ${fmt(job.cost)}</span></div>
     </div>
-  `;
+  `).join('');
 }
 document.getElementById('orderSearchBtn').addEventListener('click', searchOrder);
 document.getElementById('orderSearchInput').addEventListener('keydown', e=>{ if(e.key==='Enter') searchOrder(); });

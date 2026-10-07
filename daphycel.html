@@ -1641,11 +1641,14 @@ document.getElementById('rqAddBtn').addEventListener('click', async ()=>{
     toInsert.push({brand, model, details, work, accessories: accessories || 'Ninguno', pass: pass || 'Sin contraseña', customerId: match ? match.id : null});
   }
   try{
+    // Un solo numero de orden para todo el lote (aunque sean "varios equipos"),
+    // para poder mandarle al cliente un solo ticket/link en vez de uno por equipo.
+    const orderNum = sbThrow(await sb.rpc('increment_counter', {p_key:'order'}));
+    const orderNo = 'OR-'+orderNum;
     for(const d of toInsert){
       const repNum = sbThrow(await sb.rpc('increment_counter', {p_key:'repair'}));
-      const orderNum = sbThrow(await sb.rpc('increment_counter', {p_key:'order'}));
       sbThrow(await sb.from('repairs').insert({
-        id:'EQ-'+String(repNum).padStart(3,'0'), order_no:'OR-'+orderNum,
+        id:'EQ-'+String(repNum).padStart(3,'0'), order_no:orderNo,
         customer, customer_id:d.customerId, brand:d.brand, model:d.model, device:d.brand+' '+d.model,
         details:d.details, work:d.work, accessories:d.accessories, pass:d.pass,
         received: isoToday(), status:'Recibido', type:'reparacion', cost:0, charged:false,
