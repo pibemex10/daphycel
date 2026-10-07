@@ -1190,11 +1190,25 @@ function renderGrid(){
         <span class="stock ${p.stock<=5?'low':''}">${p.stock} pzas</span>
       </div>
       <div class="pcard-actions">
-        <button class="btn btn-sm" style="width:100%;" data-code="${p.sku}">Ver código</button>
+        <button class="add-btn" data-sell="${p.sku}" ${p.stock<=0?'disabled':''}>${p.stock<=0?'Sin stock':'Vender'}</button>
+        <button class="btn btn-sm" data-code="${p.sku}">Ver código</button>
       </div>
     </div>
   `).join('');
   grid.querySelectorAll('[data-code]').forEach(b=>b.addEventListener('click', ()=>{ openCodeModal(b.dataset.code); }));
+  grid.querySelectorAll('[data-sell]').forEach(b=>b.addEventListener('click', ()=>sellFromCatalog(b.dataset.sell)));
+}
+async function sellFromCatalog(sku){
+  const p = findProduct(sku);
+  if(!p) return;
+  addToTicket(sku);
+  await switchView('pos');
+  activePosSub = 'venta';
+  document.querySelectorAll('#posSubNav .chip[data-sub]').forEach(c=>c.classList.toggle('active', c.dataset.sub==='venta'));
+  document.getElementById('posSubVenta').classList.remove('hidden');
+  document.getElementById('posSubCancelaciones').classList.add('hidden');
+  document.getElementById('posSubEquipos').classList.add('hidden');
+  renderPosSub();
 }
 
 document.getElementById('searchInput').addEventListener('input', e=>{ searchTerm = e.target.value; renderGrid(); });
