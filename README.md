@@ -83,24 +83,30 @@ window.DaphycelDB.read()   // trae el estado completo desde Supabase (products, 
 window.DaphycelDB.reset()  // ya no reinicia nada; solo explica que los datos viven en Supabase
 ```
 
-## Publicado en internet (Netlify)
+## Publicado en internet (GitHub Pages)
 
-- **Tienda pública:** https://scintillating-selkie-c94035.netlify.app/daphycel-cliente.html
-- **Panel interno:** https://scintillating-selkie-c94035.netlify.app/daphycel.html
+- **Tienda pública:** https://pibemex10.github.io/daphycel/daphycel-cliente.html
+- **Panel interno:** https://pibemex10.github.io/daphycel/daphycel.html
 
-Se publica solo `daphycel.html` y `daphycel-cliente.html` (más un `index.html` que redirige a la
-tienda) — no el resto del repo (docs/SQL). Para volver a publicar después de un cambio:
+Repo público (`github.com/pibemex10/daphycel`) — necesario para que GitHub Pages sea gratis. Lo que
+se ve públicamente como sitio es solo `daphycel.html`, `daphycel-cliente.html` e `index.html` (redirige
+a la tienda); el resto del repo (docs, `.sql`) es visible como código fuente en GitHub pero no se sirve
+como parte del sitio. **No hace falta ningún paso manual para publicar**: `.github/workflows/pages.yml`
+reconstruye y publica el sitio automáticamente en cada `git push` a `master` que toque esos 3 archivos
+(usa `actions/deploy-pages`, ver el repo en GitHub → pestaña **Actions** para el estado de cada corrida).
 
-```powershell
-New-Item -ItemType Directory -Force -Path .\deploy | Out-Null
-Copy-Item .\daphycel.html, .\daphycel-cliente.html .\deploy\ -Force
-npx netlify-cli deploy --dir=.\deploy --prod
-```
+`.github/workflows/supabase-ping.yml` pega un `GET` a la API de Supabase cada 3 días (cron) con la
+clave `anon` — el plan gratis de Supabase pausa el proyecto tras 7 días sin actividad, así que este
+ping lo evita. **Esto es solo preventivo**: si el proyecto ya está pausado, el ping no lo reactiva —
+hay que entrar al dashboard de Supabase y darle "Resume project" a mano.
 
-La primera vez hace falta `npx netlify-cli login` (abre el navegador para autorizar). Si un sitio
-nuevo responde 401 a todo, revisar en el dashboard de Netlify que **Site settings → Visitor access**
-no tenga el inicio de sesión del equipo forzado para producción (`sso_login_context` no debe ser
-`"all"`) — a este proyecto le pasó por defecto al crear el equipo desde la CLI.
+### Histórico: Netlify
+
+El sitio vivió antes en Netlify (`scintillating-selkie-c94035.netlify.app`) — se dejó de usar porque
+el despliegue se bloqueó por crédito agotado de la cuenta. El flujo seguía siendo el mismo (`deploy/`
+local + `npx netlify-cli deploy --dir=.\deploy --prod`) si en algún momento se quiere volver a esa
+plataforma; la carpeta `deploy/` sigue existiendo localmente (en `.gitignore`, nunca se subió a git)
+por si hace falta reconstruirla.
 
 ## Documentación relacionada
 

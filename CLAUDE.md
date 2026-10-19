@@ -37,9 +37,17 @@ El esquema relacional vive en Supabase (`supabase-schema.sql` + `supabase-schema
 
 ## ⚠️ Esta base de datos es de producción real
 
-Desde octubre 2026 la app está en uso real (sitio público en Netlify, cuentas reales creadas por el dueño —
-ver `users_public` antes de asumir que `vendedor`/`admin` de la semilla siguen existiendo, probablemente ya
-no). **Nunca correr scripts de prueba/verificación directo contra la base de Supabase de este proyecto sin
+Desde octubre 2026 la app está en uso real (sitio público — hospedado en GitHub Pages desde el
+19 de octubre de 2026, antes estuvo en Netlify hasta que el despliegue se bloqueó por crédito agotado;
+ver sección "Publicado en internet" de `README.md` para los links y el detalle del cambio —, cuentas reales
+creadas por el dueño — ver `users_public` antes de asumir que `vendedor`/`admin` de la semilla siguen
+existiendo, probablemente ya no). El repo es público en `github.com/pibemex10/daphycel` (requisito de
+GitHub Pages gratis) y se publica solo vía GitHub Actions (`.github/workflows/pages.yml`), nunca a mano.
+La base de Supabase del plan gratis se pausa sola tras 7 días sin actividad — hay un ping automático
+(`.github/workflows/supabase-ping.yml`, cada 3 días) para evitarlo, pero si llegara a pausarse de nuevo
+(por ejemplo si GitHub Actions se deshabilita o el ping falla silenciosamente por mucho tiempo), reactivarla
+es manual desde el dashboard de Supabase — no hay forma de hacerlo por API con la clave `anon`.
+**Nunca correr scripts de prueba/verificación directo contra la base de Supabase de este proyecto sin
 limpiar después**, y nunca usar las credenciales de prueba viejas sin confirmar primero que la cuenta sigue
 existiendo. Para pruebas: crear un usuario y/o producto temporal desechable (`create_user`/`insert`), probar,
 y borrarlo con `delete_user`/`delete` al terminar — nunca editar ni borrar cuentas o productos reales sin que
