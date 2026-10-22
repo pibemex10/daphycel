@@ -347,7 +347,15 @@ table.inv tr:hover td{background:var(--surface);}
     <div id="posSubEquipos" class="hidden">
       <div class="card" style="padding:18px;margin-bottom:22px;">
         <h3 class="section-title">Registrar equipo(s)</h3>
-        <div class="field" style="margin-bottom:12px;"><label>Cliente</label><input type="text" id="rqCustomer" placeholder="Nombre del cliente"></div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>Cliente</label>
+          <div class="pay-method" style="max-width:300px;margin-bottom:8px;">
+            <label><input type="radio" name="rqCustomerMode" value="nuevo" checked> Cliente nuevo</label>
+            <label><input type="radio" name="rqCustomerMode" value="existente"> Cliente existente</label>
+          </div>
+          <input type="text" id="rqCustomer" placeholder="Nombre del cliente">
+          <select id="rqCustomerSelect" class="cust-select hidden"><option value="">Selecciona un cliente...</option></select>
+        </div>
         <div class="pay-method" style="max-width:340px;">
           <label><input type="radio" name="rqMode" value="uno" checked> Un equipo</label>
           <label><input type="radio" name="rqMode" value="varios"> Varios equipos</label>
@@ -1696,9 +1704,32 @@ function openRepairDetail(id){
 document.getElementById('closeRepairDetail').addEventListener('click', ()=>document.getElementById('repairDetailModal').classList.remove('show'));
 document.getElementById('repairDetailModal').addEventListener('click', e=>{ if(e.target.id==='repairDetailModal') e.currentTarget.classList.remove('show'); });
 
+function populateRqCustomerSelect(){
+  const sel = document.getElementById('rqCustomerSelect');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Selecciona un cliente...</option>' +
+    customers.map(c=>`<option value="${c.id}">${c.name}${c.balance>0 ? ' — debe '+fmt(c.balance) : ''}</option>`).join('');
+  sel.value = current;
+}
+document.querySelectorAll('input[name="rqCustomerMode"]').forEach(r=>r.addEventListener('change', ()=>{
+  const mode = document.querySelector('input[name="rqCustomerMode"]:checked').value;
+  document.getElementById('rqCustomer').classList.toggle('hidden', mode==='existente');
+  document.getElementById('rqCustomerSelect').classList.toggle('hidden', mode!=='existente');
+  if(mode==='existente') populateRqCustomerSelect();
+}));
 document.getElementById('rqAddBtn').addEventListener('click', async ()=>{
-  const customer = document.getElementById('rqCustomer').value.trim();
-  if(!customer){ alert('Ingresa el nombre del cliente.'); return; }
+  const customerMode = document.querySelector('input[name="rqCustomerMode"]:checked').value;
+  let customerName, existingCustomerId = null;
+  if(customerMode==='existente'){
+    existingCustomerId = document.getElementById('rqCustomerSelect').value;
+    if(!existingCustomerId){ alert('Selecciona un cliente existente.'); return; }
+    const c = customers.find(x=>x.id===existingCustomerId);
+    if(!c){ alert('El cliente seleccionado ya no existe. Vuelve a intentar.'); return; }
+    customerName = c.name;
+  } else {
+    customerName = document.getElementById('rqCustomer').value.trim();
+    if(!customerName){ alert('Ingresa el nombre del cliente.'); return; }
+  }
   const blocks = document.querySelectorAll('#rqDevicesContainer .device-block');
   if(blocks.length===0){ alert('Agrega al menos un equipo.'); return; }
   const toInsert = [];
@@ -1710,10 +1741,15 @@ document.getElementById('rqAddBtn').addEventListener('click', async ()=>{
     const accessories = block.querySelector('.dv-accesorios').value.trim();
     const pass = block.querySelector('.dv-pass').value.trim();
     if(!brand || !model || !work){ alert('Completa al menos Marca, Modelo y Trabajo a realizar en cada equipo.'); return; }
-    const match = customers.find(c=>c.name.toLowerCase()===customer.toLowerCase());
-    toInsert.push({brand, model, details, work, accessories: accessories || 'Ninguno', pass: pass || 'Sin contraseña', customerId: match ? match.id : null});
+    toInsert.push({brand, model, details, work, accessories: accessories || 'Ninguno', pass: pass || 'Sin contraseña'});
   }
   try{
+    let customerId = existingCustomerId || null;
+    if(customerMode==='nuevo'){
+      const clientNum = sbThrow(await sb.rpc('increment_counter', {p_key:'client'}));
+      customerId = 'C-' + String(clientNum).padStart(3,'0');
+      sbThrow(await sb.from('customers').insert({id:customerId, name:customerName, phone:'', notes:'', since: isoToday(), balance:0}));
+    }
     // Un solo numero de orden para todo el lote (aunque sean "varios equipos"),
     // para poder mandarle al cliente un solo ticket/link en vez de uno por equipo.
     const orderNum = sbThrow(await sb.rpc('increment_counter', {p_key:'order'}));
@@ -1722,7 +1758,7 @@ document.getElementById('rqAddBtn').addEventListener('click', async ()=>{
       const repNum = sbThrow(await sb.rpc('increment_counter', {p_key:'repair'}));
       sbThrow(await sb.from('repairs').insert({
         id:'EQ-'+String(repNum).padStart(3,'0'), order_no:orderNo,
-        customer, customer_id:d.customerId, brand:d.brand, model:d.model, device:d.brand+' '+d.model,
+        customer:customerName, customer_id:customerId, brand:d.brand, model:d.model, device:d.brand+' '+d.model,
         details:d.details, work:d.work, accessories:d.accessories, pass:d.pass,
         received: isoToday(), status:'Recibido', type:'reparacion', cost:0, charged:false,
       }));
@@ -1730,9 +1766,13 @@ document.getElementById('rqAddBtn').addEventListener('click', async ()=>{
   }catch(e){ showDbError(e); return; }
   await reloadFromStore();
   document.getElementById('rqCustomer').value = '';
+  document.getElementById('rqCustomerSelect').value = '';
+  document.querySelector('input[name="rqCustomerMode"][value="nuevo"]').checked = true;
+  document.getElementById('rqCustomer').classList.remove('hidden');
+  document.getElementById('rqCustomerSelect').classList.add('hidden');
   document.querySelector('input[name="rqMode"][value="uno"]').checked = true;
   resetDeviceBlocks('uno');
-  renderRepairQueue();
+  renderRepairQueue(); renderClientes();
   alert(toInsert.length>1 ? toInsert.length+' equipos registrados correctamente.' : 'Equipo registrado correctamente.');
 });
 
