@@ -288,6 +288,7 @@ table.inv tr:hover td{background:var(--surface);}
           <div class="pos-scan">
             <input type="text" id="posScanInput" placeholder="Escanear o escribir SKU (ej. PANT-001)...">
             <button class="btn btn-primary" id="posScanBtn">Agregar</button>
+            <button class="btn" id="posExternalBtn">Producto externo</button>
           </div>
           <div class="pos-tiles" id="posTiles"></div>
         </div>
@@ -356,6 +357,14 @@ table.inv tr:hover td{background:var(--surface);}
         </div>
         <div id="rqDevicesContainer" style="margin-top:14px;"></div>
         <button class="btn btn-sm hidden" id="rqAddDeviceBlock" style="margin-top:4px;">+ Agregar otro equipo</button>
+        <div class="field" style="margin-top:14px;max-width:340px;">
+          <label>Si cobras algo ahora (enganche o pago completo), ¿cómo paga?</label>
+          <div class="pay-method">
+            <label><input type="radio" name="rqPayMethod" value="efectivo" checked> Efectivo</label>
+            <label><input type="radio" name="rqPayMethod" value="tarjeta"> Tarjeta</label>
+            <label><input type="radio" name="rqPayMethod" value="transferencia"> Transferencia</label>
+          </div>
+        </div>
         <button class="btn btn-primary" id="rqAddBtn" style="margin-top:14px;display:block;">Registrar equipo(s)</button>
       </div>
       <div class="card" style="padding:14px 18px;margin-bottom:22px;">
@@ -860,6 +869,21 @@ table.inv tr:hover td{background:var(--surface);}
   </div>
 </div>
 
+<!-- producto externo al catalogo (venta de algo que no esta en inventario) -->
+<div class="modal-bg" id="externalProductModal">
+  <div class="modal" style="width:320px;text-align:left;">
+    <h3>Producto externo</h3>
+    <p style="color:var(--text-faint);font-size:12px;margin:6px 0 14px;">Para vender algo que no está en el catálogo. No descuenta stock.</p>
+    <div class="field"><label>Nombre</label><input type="text" id="extName" placeholder="Ej. Funda genérica"></div>
+    <div class="field"><label>Precio (MXN)</label><input type="number" id="extPrice" placeholder="0.00"></div>
+    <div class="field"><label>Cantidad</label><input type="number" id="extQty" value="1" min="1"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn btn-primary" id="extAddBtn" style="flex:1;">Agregar al ticket</button>
+      <button class="btn" id="extCancelBtn">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /appRoot -->
 
 <script>
@@ -1018,11 +1042,12 @@ let loggedInUser = null;
 let activeCat = 'all';
 let searchTerm = '';
 let ticket = {}; // sku -> qty (POS ticket)
+let externalItemsInfo = {}; // clave temporal (EXT-...) -> {name, price} de productos externos al catalogo, solo del ticket actual
 
 const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
 const fechaLocal = () => new Date().toLocaleDateString('es-MX', {day:'2-digit', month:'2-digit', year:'numeric'});
 const catLabel = id => (CATS.find(c=>c.id===id)||{}).label || id;
-const findProduct = sku => products.find(p=>p.sku===sku);
+const findProduct = sku => products.find(p=>p.sku===sku) || (externalItemsInfo[sku] ? {sku, name:externalItemsInfo[sku].name, price:externalItemsInfo[sku].price, stock:Infinity} : undefined);
 
 /* ============================================================
    NAV
@@ -1303,6 +1328,25 @@ function addToTicket(sku){
   ticket[sku] = (ticket[sku]||0) + 1;
   renderTicket();
 }
+document.getElementById('posExternalBtn').addEventListener('click', ()=>{
+  document.getElementById('extName').value = '';
+  document.getElementById('extPrice').value = '';
+  document.getElementById('extQty').value = 1;
+  document.getElementById('externalProductModal').classList.add('show');
+});
+document.getElementById('extCancelBtn').addEventListener('click', ()=>document.getElementById('externalProductModal').classList.remove('show'));
+document.getElementById('externalProductModal').addEventListener('click', e=>{ if(e.target.id==='externalProductModal') e.currentTarget.classList.remove('show'); });
+document.getElementById('extAddBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('extName').value.trim();
+  const price = parseFloat(document.getElementById('extPrice').value);
+  const qty = parseInt(document.getElementById('extQty').value) || 1;
+  if(!name || isNaN(price) || price<=0){ alert('Escribe un nombre y un precio válidos.'); return; }
+  const key = 'EXT-' + Date.now() + '-' + Math.floor(Math.random()*1000);
+  externalItemsInfo[key] = {name, price};
+  ticket[key] = qty;
+  renderTicket();
+  document.getElementById('externalProductModal').classList.remove('show');
+});
 function changeTicketQty(sku, delta){
   ticket[sku] = (ticket[sku]||0) + delta;
   if(ticket[sku]<=0) delete ticket[sku];
@@ -1388,7 +1432,12 @@ async function cobrar(){
     cash = t.total; // tarjeta / transferencia: se cobra el total exacto por esa vía
   }
   const change = method==='efectivo' ? cash-t.total : 0;
-  const items = entries.map(([sku,qty])=>({sku, name:findProduct(sku).name, qty, price:findProduct(sku).price}));
+  const items = entries.map(([sku,qty])=>{
+    const p = findProduct(sku);
+    const isExternal = !!externalItemsInfo[sku];
+    return {sku: isExternal ? null : sku, name:p.name, qty, price:p.price};
+  });
+  const externalSold = entries.filter(([sku])=>externalItemsInfo[sku]).map(([sku])=>externalItemsInfo[sku]);
   const cobrarBtn = document.getElementById('cobrarBtn');
   cobrarBtn.disabled = true;
   let saleId;
@@ -1405,9 +1454,11 @@ async function cobrar(){
   await reloadFromStore();
   const sale = sales.find(s=>s.id===saleId);
   showReceipt(sale);
-  ticket = {}; document.getElementById('cashInput').value=''; document.getElementById('posRepairSelect').value='';
+  pendingExternalRegister = externalSold;
+  ticket = {}; externalItemsInfo = {}; document.getElementById('cashInput').value=''; document.getElementById('posRepairSelect').value='';
   renderTicket(); renderPosTiles(); renderGrid(); renderInventory(); renderClientes(); renderRepairQueue();
 }
+let pendingExternalRegister = [];
 function showReceipt(sale){
   const body = document.getElementById('receiptBody');
   const custName = sale.customerId ? (customers.find(c=>c.id===sale.customerId)||{}).name : 'Cliente general';
@@ -1500,6 +1551,8 @@ function deviceBlockHTML(showRemove){
         <div class="field wide" style="grid-column:1/-1;"><label>Trabajo a realizar</label><input type="text" class="dv-trabajo" placeholder="Ej. Cambio de pantalla"></div>
         <div class="field"><label>Deja accesorios</label><input type="text" class="dv-accesorios" placeholder="Ej. Cargador, funda (o Ninguno)"></div>
         <div class="field"><label>Contraseña / patrón / PIN</label><input type="text" class="dv-pass" placeholder="Ej. 1234 o patrón"></div>
+        <div class="field"><label>Costo total de la reparación (opcional)</label><input type="number" class="dv-costo" placeholder="Ej. 990"></div>
+        <div class="field"><label>Paga ahora / enganche (opcional)</label><input type="number" class="dv-pagoahora" placeholder="Ej. 500"></div>
       </div>
     </div>`;
 }
@@ -1530,6 +1583,9 @@ async function copyToClipboard(text){
 function pendingSalesForRepair(repairId){
   return sales.filter(s=>s.linkedRepairId===repairId && s.method==='entrega' && !s.cancelled);
 }
+function repairPaidSoFar(repairId){
+  return sales.filter(s=>s.linkedRepairId===repairId && s.tipo==='reparacion' && !s.cancelled).reduce((a,s)=>a+s.total,0);
+}
 /* Los tres bloques (En proceso / Listos para entrega / Entregados) empiezan
    ocultos: solo se abren a mano o automáticamente cuando la búsqueda por
    número de orden encuentra algo adentro. */
@@ -1552,6 +1608,17 @@ function repairRowHTML(r, term){
     ? `<br><button class="btn btn-sm btn-primary" style="margin-top:4px;" data-chargepending="${r.id}">Cobrar pendiente (${fmt(pendienteTotal)})</button>`
     : (pendientes.length>0 ? `<br><span class="stock-tag low" style="margin-top:4px;display:inline-block;">Pendiente al entregar: ${fmt(pendienteTotal)}</span>` : '');
   const orderCell = term ? r.order.replace(new RegExp('('+escapeRegExp(term)+')','ig'), '<mark>$1</mark>') : r.order;
+  const paidSoFar = repairPaidSoFar(r.id);
+  let cobroCell;
+  if(r.charged){
+    cobroCell = '<span class="stock-tag ok">Cobrado '+fmt(r.cost)+'</span>';
+  } else if(paidSoFar>0){
+    cobroCell = `<span class="stock-tag low" style="display:inline-block;margin-bottom:4px;">Anticipo ${fmt(paidSoFar)} de ${fmt(r.cost)}</span><br><button class="btn btn-sm btn-primary" data-charge="${r.id}">Cobrar resto (${fmt(Math.max(0,r.cost-paidSoFar))})</button>`;
+  } else if(r.cost>0){
+    cobroCell = `<button class="btn btn-sm btn-primary" data-charge="${r.id}">Cobrar (${fmt(r.cost)})</button>`;
+  } else {
+    cobroCell = `<button class="btn btn-sm btn-primary" data-charge="${r.id}">Cobrar</button>`;
+  }
   return `<tr>
     <td class="mono">${orderCell}</td>
     <td>${r.device}</td>
@@ -1563,7 +1630,7 @@ function repairRowHTML(r, term){
         ${REPAIR_STATUSES.map(st=>`<option value="${st}" ${st===r.status?'selected':''}>${st}</option>`).join('')}
       </select>
     </td>
-    <td>${r.charged ? '<span class="stock-tag ok">Cobrado '+fmt(r.cost)+'</span>' : `<button class="btn btn-sm btn-primary" data-charge="${r.id}">Cobrar</button>`}${pendienteBtn}</td>
+    <td>${cobroCell}${pendienteBtn}</td>
     <td><button class="btn btn-sm" data-detail="${r.id}">Ver detalle</button> <button class="btn btn-sm" data-copylink="${r.id}">Copiar link</button>${currentRole==='dueno' ? ` <button class="btn btn-sm btn-danger" data-delrepair="${r.id}">Eliminar</button>` : ''}</td>
   </tr>`;
 }
@@ -1669,8 +1736,11 @@ function openRepairChargeModal(id){
   const r = repairs.find(x=>x.id===id);
   if(!r) return;
   chargingRepairId = id;
-  document.getElementById('rcInfo').textContent = r.device+' · '+r.customer+' · '+r.work;
-  document.getElementById('rcAmount').value = '';
+  const paid = repairPaidSoFar(id);
+  const remaining = r.cost>0 ? Math.max(0, r.cost-paid) : 0;
+  document.getElementById('rcInfo').textContent = r.device+' · '+r.customer+' · '+r.work
+    + (r.cost>0 ? ' · Costo total: '+fmt(r.cost)+(paid>0 ? ' · Ya pagado: '+fmt(paid) : '') : '');
+  document.getElementById('rcAmount').value = remaining>0 ? remaining : '';
   document.querySelector('input[name="rcMethod"][value="efectivo"]').checked = true;
   document.getElementById('repairChargeModal').classList.add('show');
 }
@@ -1682,12 +1752,14 @@ document.getElementById('rcConfirmBtn').addEventListener('click', async ()=>{
   const amount = parseFloat(document.getElementById('rcAmount').value);
   if(isNaN(amount) || amount<=0){ alert('Ingresa un monto válido.'); return; }
   const method = document.querySelector('input[name="rcMethod"]:checked').value;
+  const totalCost = r.cost>0 ? r.cost : amount; // si no se fijo costo al registrar el equipo, este cobro lo define
   try{
     const nextNum = sbThrow(await sb.rpc('increment_counter', {p_key:'sale'}));
     const saleId = 'R-' + nextNum;
-    sbThrow(await sb.from('sales').insert({id:saleId, customer_id:null, method, tipo:'reparacion', subtotal:amount, iva:0, total:amount, cash:amount, change_amount:0}));
+    sbThrow(await sb.from('sales').insert({id:saleId, customer_id:r.customerId, method, tipo:'reparacion', subtotal:amount, iva:0, total:amount, cash:amount, change_amount:0, linked_repair_id:r.id}));
     sbThrow(await sb.from('sale_items').insert({sale_id:saleId, sku:null, name:r.device+' — '+r.work, qty:1, price:amount}));
-    sbThrow(await sb.from('repairs').update({charged:true, cost:amount}).eq('id', r.id));
+    const totalPaid = repairPaidSoFar(r.id) + amount;
+    sbThrow(await sb.from('repairs').update({charged: totalPaid>=totalCost, cost: totalCost}).eq('id', r.id));
   }catch(e){ showDbError(e); return; }
   await reloadFromStore();
   document.getElementById('repairChargeModal').classList.remove('show');
@@ -1745,9 +1817,13 @@ document.getElementById('rqAddBtn').addEventListener('click', async ()=>{
     const work = block.querySelector('.dv-trabajo').value.trim();
     const accessories = block.querySelector('.dv-accesorios').value.trim();
     const pass = block.querySelector('.dv-pass').value.trim();
+    const costo = parseFloat(block.querySelector('.dv-costo').value) || 0;
+    const pagoAhora = parseFloat(block.querySelector('.dv-pagoahora').value) || 0;
     if(!brand || !model || !work){ alert('Completa al menos Marca, Modelo y Trabajo a realizar en cada equipo.'); return; }
-    toInsert.push({brand, model, details, work, accessories: accessories || 'Ninguno', pass: pass || 'Sin contraseña'});
+    if(pagoAhora>costo && costo>0){ alert('El pago ahora no puede ser mayor al costo total de la reparación.'); return; }
+    toInsert.push({brand, model, details, work, accessories: accessories || 'Ninguno', pass: pass || 'Sin contraseña', costo, pagoAhora});
   }
+  const payMethod = document.querySelector('input[name="rqPayMethod"]:checked').value;
   try{
     let customerId = existingCustomerId || null;
     if(customerMode==='nuevo'){
@@ -1761,12 +1837,20 @@ document.getElementById('rqAddBtn').addEventListener('click', async ()=>{
     const orderNo = 'OR-'+orderNum;
     for(const d of toInsert){
       const repNum = sbThrow(await sb.rpc('increment_counter', {p_key:'repair'}));
+      const repairId = 'EQ-'+String(repNum).padStart(3,'0');
       sbThrow(await sb.from('repairs').insert({
-        id:'EQ-'+String(repNum).padStart(3,'0'), order_no:orderNo,
+        id:repairId, order_no:orderNo,
         customer:customerName, customer_id:customerId, brand:d.brand, model:d.model, device:d.brand+' '+d.model,
         details:d.details, work:d.work, accessories:d.accessories, pass:d.pass,
-        received: isoToday(), status:'Recibido', type:'reparacion', cost:0, charged:false,
+        received: isoToday(), status:'Recibido', type:'reparacion', cost:d.costo, charged:d.costo>0 && d.pagoAhora>=d.costo,
       }));
+      // si deja enganche o paga todo de una vez, ese cobro entra a caja ahora mismo
+      if(d.pagoAhora>0){
+        const saleNum = sbThrow(await sb.rpc('increment_counter', {p_key:'sale'}));
+        const saleId = 'R-' + saleNum;
+        sbThrow(await sb.from('sales').insert({id:saleId, customer_id:customerId, method:payMethod, tipo:'reparacion', subtotal:d.pagoAhora, iva:0, total:d.pagoAhora, cash:d.pagoAhora, change_amount:0, linked_repair_id:repairId}));
+        sbThrow(await sb.from('sale_items').insert({sale_id:saleId, sku:null, name:d.brand+' '+d.model+' — '+d.work, qty:1, price:d.pagoAhora}));
+      }
     }
   }catch(e){ showDbError(e); return; }
   await reloadFromStore();
@@ -1776,8 +1860,9 @@ document.getElementById('rqAddBtn').addEventListener('click', async ()=>{
   document.getElementById('rqCustomer').classList.remove('hidden');
   document.getElementById('rqCustomerSelect').classList.add('hidden');
   document.querySelector('input[name="rqMode"][value="uno"]').checked = true;
+  document.querySelector('input[name="rqPayMethod"][value="efectivo"]').checked = true;
   resetDeviceBlocks('uno');
-  renderRepairQueue(); renderClientes();
+  renderRepairQueue(); renderClientes(); renderPanel();
   alert(toInsert.length>1 ? toInsert.length+' equipos registrados correctamente.' : 'Equipo registrado correctamente.');
 });
 
@@ -2067,7 +2152,7 @@ function openClientModal(id){
   const repBox = document.getElementById('cdRepairs');
   repBox.innerHTML = customerRepairs.length===0
     ? '<div class="empty" style="padding:12px 0;">No tuvo reparación.</div>'
-    : customerRepairs.map(r=>`<div class="cd-history-item"><span>${r.order} · ${r.device}<br><span class="s-time">${r.work}</span></span><span class="stock-tag ${r.status==='Entregado'?'ok':'low'}">${r.status}</span></div>`).join('');
+    : customerRepairs.map(r=>`<div class="cd-history-item"><span>${r.order} · ${r.device}<br><span class="s-time">${r.work}</span></span><span style="text-align:right;"><span class="stock-tag ${r.status==='Entregado'?'ok':'low'}">${r.status}</span><br><span class="mono" style="font-size:12px;">${fmt(r.cost)}</span></span></div>`).join('');
   document.getElementById('abonoInput').value = '';
   const canAbonar = hasPerm('abonos');
   document.getElementById('abonoRow').classList.toggle('hidden', !canAbonar);
@@ -2318,7 +2403,26 @@ document.getElementById('cajaFinalBtn').addEventListener('click', async ()=>{
 ============================================================ */
 document.getElementById('closeModal').addEventListener('click', closeCodeModal);
 document.getElementById('codeModal').addEventListener('click', e=>{ if(e.target.id==='codeModal') closeCodeModal(); });
-document.getElementById('closeReceipt').addEventListener('click', ()=>document.getElementById('receiptModal').classList.remove('show'));
+document.getElementById('closeReceipt').addEventListener('click', async ()=>{
+  document.getElementById('receiptModal').classList.remove('show');
+  const toOffer = pendingExternalRegister;
+  pendingExternalRegister = [];
+  for(const item of toOffer){
+    if(confirm('Vendiste "'+item.name+'" como producto externo.\n¿Quieres registrarlo en el catálogo para la próxima vez?')){
+      await switchView('inventario');
+      activeInvSub = 'agregar';
+      document.querySelectorAll('#invSubNav .chip').forEach(c=>c.classList.toggle('active', c.dataset.sub==='agregar'));
+      document.getElementById('invSubAgregar').classList.remove('hidden');
+      document.getElementById('invSubEditar').classList.add('hidden');
+      document.getElementById('invSubBorrar').classList.add('hidden');
+      document.getElementById('invSubFotos').classList.add('hidden');
+      renderInventory();
+      document.getElementById('fName').value = item.name;
+      document.getElementById('fPrice').value = item.price;
+      break; // uno a la vez, para no saturar de confirms si se vendieron varios
+    }
+  }
+});
 document.getElementById('receiptModal').addEventListener('click', e=>{ if(e.target.id==='receiptModal') e.currentTarget.classList.remove('show'); });
 document.getElementById('posScanBtn').addEventListener('click', posScan);
 document.getElementById('posScanInput').addEventListener('keydown', e=>{ if(e.key==='Enter') posScan(); });
