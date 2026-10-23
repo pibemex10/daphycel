@@ -167,13 +167,7 @@ table.inv tr:hover td{background:var(--surface);}
 .field input:focus, .field select:focus{outline:none;border-color:var(--accent);}
 
 /* ---------- clientes ---------- */
-.client-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
-.client-card{background:var(--surface);border:1px solid var(--border-soft);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:border-color .15s;}
-.client-card:hover{border-color:var(--accent);}
-.client-card .cl-name{font-size:14.5px;font-weight:600;}
-.client-card .cl-meta{font-size:12px;color:var(--text-faint);}
-.client-card .cl-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:8px;border-top:1px solid var(--border-soft);}
-.client-card .cl-spent{font-size:12px;color:var(--text-dim);}
+.client-row{cursor:pointer;}
 .balance-tag{font-family:'IBM Plex Mono';font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:12px;}
 .balance-tag.zero{background:var(--surface-2);color:var(--text-dim);}
 .balance-tag.due{background:var(--warn-soft);color:var(--warn);}
@@ -441,7 +435,14 @@ table.inv tr:hover td{background:var(--surface);}
         <input type="text" id="clientSearchInput" placeholder="Buscar cliente por nombre o teléfono...">
       </div>
     </div>
-    <div class="client-grid" id="clientGrid"></div>
+    <div class="inv-table-wrap card">
+      <table class="inv">
+        <thead>
+          <tr><th>Número</th><th>Nombre</th><th>Teléfono</th><th>Cliente desde</th><th>Compras</th><th>Saldo</th></tr>
+        </thead>
+        <tbody id="clientGrid"></tbody>
+      </table>
+    </div>
   </section>
 
   <!-- ============ INVENTARIO ============ -->
@@ -772,6 +773,10 @@ table.inv tr:hover td{background:var(--surface);}
       <div class="cd-row"><span>Saldo pendiente</span><span class="mono" id="cdBalance"></span></div>
       <h3 class="section-title" style="margin-top:16px;font-size:13px;">Historial de compras</h3>
       <div id="cdHistory"></div>
+      <h3 class="section-title" style="margin-top:16px;font-size:13px;">Equipos / reparaciones</h3>
+      <div class="cd-row"><span>Entregados</span><span class="mono" id="cdRepEntregados"></span></div>
+      <div class="cd-row"><span>Pendientes</span><span class="mono" id="cdRepPendientes"></span></div>
+      <div id="cdRepairs"></div>
     </div>
     <div class="abono-row" id="abonoRow">
       <input type="number" id="abonoInput" placeholder="Monto a abonar">
@@ -1985,24 +1990,23 @@ function renderClientes(){
   let list = customers.filter(c=>{
     if(!clientSearchTerm) return true;
     const t = clientSearchTerm.toLowerCase();
-    return c.name.toLowerCase().includes(t) || c.phone.toLowerCase().includes(t);
+    return c.name.toLowerCase().includes(t) || c.phone.toLowerCase().includes(t) || c.id.toLowerCase().includes(t);
   });
-  if(list.length===0){ grid.innerHTML = '<div class="empty">No se encontraron clientes.</div>'; }
+  if(list.length===0){ grid.innerHTML = '<tr><td colspan="6" class="empty">No se encontraron clientes.</td></tr>'; }
   else{
     grid.innerHTML = list.map(c=>{
       const spent = customerSpent(c.id);
       const balTag = c.balance>0 ? `<span class="balance-tag due">Debe ${fmt(c.balance)}</span>` : `<span class="balance-tag zero">Sin saldo</span>`;
-      return `<div class="client-card" data-id="${c.id}">
-        <div class="cl-name">${c.name}</div>
-        <div class="cl-meta mono">${c.phone||'—'}</div>
-        <div class="cl-meta">Cliente desde ${c.since}</div>
-        <div class="cl-bottom">
-          <span class="cl-spent">Compras: ${fmt(spent)}</span>
-          ${balTag}
-        </div>
-      </div>`;
+      return `<tr class="client-row" data-id="${c.id}">
+        <td class="mono">${c.id}</td>
+        <td>${c.name}</td>
+        <td class="mono">${c.phone||'—'}</td>
+        <td class="mono">${c.since}</td>
+        <td class="mono">${fmt(spent)}</td>
+        <td>${balTag}</td>
+      </tr>`;
     }).join('');
-    grid.querySelectorAll('.client-card').forEach(card=>card.addEventListener('click', ()=>openClientModal(card.dataset.id)));
+    grid.querySelectorAll('.client-row').forEach(row=>row.addEventListener('click', ()=>openClientModal(row.dataset.id)));
   }
   document.getElementById('statClientCount').textContent = customers.length;
   document.getElementById('statCarteraTotal').textContent = fmt(customers.reduce((a,c)=>a+c.balance,0));
@@ -2055,6 +2059,15 @@ function openClientModal(id){
   histBox.innerHTML = hist.length===0
     ? '<div class="empty" style="padding:20px 0;">Sin compras registradas.</div>'
     : hist.map(s=>`<div class="cd-history-item"><span>${s.id} · ${s.items.length} artículo(s)<br><span class="s-time">${s.time} · ${methodLabel(s.method)}</span></span><span class="mono">${fmt(s.total)}</span></div>`).join('');
+  const customerRepairs = repairs.filter(r=>r.customerId===id);
+  const repEntregados = customerRepairs.filter(r=>r.status==='Entregado');
+  const repPendientes = customerRepairs.filter(r=>r.status!=='Entregado');
+  document.getElementById('cdRepEntregados').textContent = repEntregados.length;
+  document.getElementById('cdRepPendientes').textContent = repPendientes.length;
+  const repBox = document.getElementById('cdRepairs');
+  repBox.innerHTML = customerRepairs.length===0
+    ? '<div class="empty" style="padding:12px 0;">No tuvo reparación.</div>'
+    : customerRepairs.map(r=>`<div class="cd-history-item"><span>${r.order} · ${r.device}<br><span class="s-time">${r.work}</span></span><span class="stock-tag ${r.status==='Entregado'?'ok':'low'}">${r.status}</span></div>`).join('');
   document.getElementById('abonoInput').value = '';
   const canAbonar = hasPerm('abonos');
   document.getElementById('abonoRow').classList.toggle('hidden', !canAbonar);
