@@ -126,6 +126,11 @@ nav.tabs button.active{background:var(--accent-soft);color:var(--accent);}
 .pos-scan{display:flex;gap:10px;margin-bottom:14px;}
 .pos-scan input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 14px;color:var(--text);font-family:'IBM Plex Mono';font-size:14px;}
 .pos-scan input:focus{outline:none;border-color:var(--accent);}
+.pos-suggestions{position:absolute;top:calc(100% + 4px);left:0;width:100%;max-height:260px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:9px;box-shadow:0 8px 20px rgba(0,0,0,.12);z-index:30;}
+.pos-suggestion-item{padding:9px 14px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--border-soft);}
+.pos-suggestion-item:last-child{border-bottom:none;}
+.pos-suggestion-item:hover{background:var(--surface-2);}
+.pos-suggestion-item .mono{color:var(--text-faint);font-size:11.5px;white-space:nowrap;}
 .pos-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;max-height:520px;overflow-y:auto;padding-right:4px;}
 .pos-tile{background:var(--surface);border:1px solid var(--border-soft);border-radius:10px;padding:10px;text-align:left;}
 .pos-tile:hover{border-color:var(--accent);}
@@ -298,12 +303,13 @@ table.inv tr:hover td{background:var(--surface);}
     <div id="posSubVenta">
       <div class="pos-layout">
         <div>
-          <div class="pos-scan">
-            <input type="text" id="posScanInput" placeholder="Escanear o escribir SKU (ej. PANT-001)...">
+          <div class="pos-scan" style="position:relative;">
+            <input type="text" id="posScanInput" placeholder="Escanear SKU o escribir el nombre del producto...">
             <button class="btn btn-primary" id="posScanBtn">Agregar</button>
             <button class="btn" id="posExternalBtn">Producto externo</button>
+            <div class="pos-suggestions hidden" id="posSuggestions"></div>
           </div>
-          <div class="pos-tiles" id="posTiles"></div>
+          <div class="pos-tiles hidden" id="posTiles"></div>
         </div>
         <div class="ticket-panel">
           <h3>Ticket actual</h3>
@@ -1144,6 +1150,7 @@ function applyRoleLocks(){
   }
   panelLocked.classList.toggle('hidden', canSeePanel);
   panelContent.classList.toggle('hidden', !canSeePanel);
+  document.getElementById('goToUsuarios').classList.toggle('hidden', currentRole!=='dueno');
   if(document.getElementById('cancelLocked')) renderPosSub();
 }
 
@@ -1345,6 +1352,28 @@ function posScan(){
   if(!p){ alert('SKU no encontrado: '+val); return; }
   addToTicket(p.sku);
   input.value = '';
+  hideScanSuggestions();
+}
+function hideScanSuggestions(){
+  const box = document.getElementById('posSuggestions');
+  box.classList.add('hidden');
+  box.innerHTML = '';
+}
+function renderScanSuggestions(){
+  const input = document.getElementById('posScanInput');
+  const val = input.value.trim().toLowerCase();
+  const box = document.getElementById('posSuggestions');
+  if(!val){ hideScanSuggestions(); return; }
+  const matches = products.filter(p=>p.name.toLowerCase().includes(val) || p.sku.toLowerCase().includes(val)).slice(0,8);
+  if(matches.length===0){ hideScanSuggestions(); return; }
+  box.innerHTML = matches.map(p=>`<div class="pos-suggestion-item" data-sku="${p.sku}"><span>${p.name}</span><span class="mono">${p.sku} · ${fmt(p.price)}</span></div>`).join('');
+  box.classList.remove('hidden');
+  box.querySelectorAll('.pos-suggestion-item').forEach(el=>el.addEventListener('click', ()=>{
+    addToTicket(el.dataset.sku);
+    input.value = '';
+    hideScanSuggestions();
+    input.focus();
+  }));
 }
 function addToTicket(sku){
   ticket[sku] = (ticket[sku]||0) + 1;
@@ -2490,6 +2519,10 @@ document.getElementById('closeReceipt').addEventListener('click', async ()=>{
 document.getElementById('receiptModal').addEventListener('click', e=>{ if(e.target.id==='receiptModal') e.currentTarget.classList.remove('show'); });
 document.getElementById('posScanBtn').addEventListener('click', posScan);
 document.getElementById('posScanInput').addEventListener('keydown', e=>{ if(e.key==='Enter') posScan(); });
+document.getElementById('posScanInput').addEventListener('input', renderScanSuggestions);
+document.addEventListener('click', e=>{
+  if(e.target.id!=='posScanInput' && !e.target.closest('#posSuggestions')) hideScanSuggestions();
+});
 document.getElementById('cashInput').addEventListener('input', updateChange);
 document.getElementById('cobrarBtn').addEventListener('click', cobrar);
 document.getElementById('clearTicket').addEventListener('click', ()=>{ ticket={}; externalItemsInfo={}; lastAutoFilledCash=null; document.getElementById('cashInput').value=''; renderTicket(); });
