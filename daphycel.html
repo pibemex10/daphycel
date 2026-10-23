@@ -201,6 +201,19 @@ table.inv tr:hover td{background:var(--surface);}
 .two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;}
 @media (max-width:880px){.two-col{grid-template-columns:1fr;}}
 .section-title{font-size:15px;margin-bottom:12px;font-weight:600;}
+
+/* ---------- ticket impreso (80mm) ---------- */
+#printArea{display:none;}
+#printArea .pt-line{display:flex;justify-content:space-between;gap:6px;}
+#printArea .pt-dash{border-top:1px dashed #000;margin:6px 0;}
+@media print{
+  body *{visibility:hidden;}
+  #printArea, #printArea *{visibility:visible;}
+  #printArea{display:block;position:absolute;top:0;left:0;width:80mm;padding:2mm;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#000;line-height:1.4;}
+  #printArea h4{font-size:14px;text-align:center;margin:0 0 2mm;}
+  #printArea .pt-center{text-align:center;}
+  @page{size:80mm auto;margin:0;}
+}
 </style>
 </head>
 <body>
@@ -298,6 +311,9 @@ table.inv tr:hover td{background:var(--surface);}
             <option value="">Cliente general (sin cuenta)</option>
           </select>
           <div class="ticket-list" id="ticketList"></div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-dim);margin:8px 0 4px;">
+            <input type="checkbox" id="posApplyIva"> Aplicar IVA (16%)
+          </label>
           <div class="total-row"><span>Subtotal</span><span id="posSubtotal" class="mono">$0.00</span></div>
           <div class="total-row"><span>IVA (16%)</span><span id="posIva" class="mono">$0.00</span></div>
           <div class="total-row grand"><span>Total</span><span id="posTotal" class="mono">$0.00</span></div>
@@ -865,9 +881,15 @@ table.inv tr:hover td{background:var(--surface);}
   <div class="modal" style="width:300px;">
     <h3>Venta cobrada ✅</h3>
     <div id="receiptBody" style="text-align:left;font-size:13px;margin-top:12px;"></div>
-    <button class="btn btn-primary" id="closeReceipt" style="margin-top:14px;width:100%;">Listo</button>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn" id="printReceiptBtn" style="flex:1;">Imprimir</button>
+      <button class="btn btn-primary" id="closeReceipt" style="flex:1;">Listo</button>
+    </div>
   </div>
 </div>
+
+<!-- area de impresion de tickets (80mm) -- oculta en pantalla, solo visible al imprimir -->
+<div id="printArea"></div>
 
 <!-- producto externo al catalogo (venta de algo que no esta en inventario) -->
 <div class="modal-bg" id="externalProductModal">
@@ -1355,9 +1377,15 @@ function changeTicketQty(sku, delta){
 function ticketTotals(){
   let subtotal = 0;
   Object.entries(ticket).forEach(([sku,qty])=>{ const p = findProduct(sku); subtotal += p.price*qty; });
-  const iva = subtotal*0.16;
+  const applyIva = document.getElementById('posApplyIva').checked;
+  const iva = applyIva ? subtotal*0.16 : 0;
   return {subtotal, iva, total: subtotal+iva};
 }
+document.getElementById('posApplyIva').addEventListener('change', renderTicket);
+/* Para que "Cobrar venta" no pida nada mas: el efectivo se autollena con el
+   total exacto cada vez que cambia, mientras el cajero no lo haya editado a
+   mano (si ya escribio un monto distinto al autollenado, se respeta el suyo). */
+let lastAutoFilledCash = null;
 function renderTicket(){
   const list = document.getElementById('ticketList');
   const entries = Object.entries(ticket);
@@ -1379,6 +1407,11 @@ function renderTicket(){
   document.getElementById('posSubtotal').textContent = fmt(t.subtotal);
   document.getElementById('posIva').textContent = fmt(t.iva);
   document.getElementById('posTotal').textContent = fmt(t.total);
+  const cashField = document.getElementById('cashInput');
+  if(cashField.value==='' || parseFloat(cashField.value)===lastAutoFilledCash){
+    cashField.value = t.total>0 ? t.total.toFixed(2) : '';
+  }
+  lastAutoFilledCash = t.total;
   updateChange();
 }
 function getPayMethod(){
@@ -1455,11 +1488,13 @@ async function cobrar(){
   const sale = sales.find(s=>s.id===saleId);
   showReceipt(sale);
   pendingExternalRegister = externalSold;
-  ticket = {}; externalItemsInfo = {}; document.getElementById('cashInput').value=''; document.getElementById('posRepairSelect').value='';
+  ticket = {}; externalItemsInfo = {}; lastAutoFilledCash = null; document.getElementById('cashInput').value=''; document.getElementById('posRepairSelect').value=''; document.getElementById('posApplyIva').checked = false;
   renderTicket(); renderPosTiles(); renderGrid(); renderInventory(); renderClientes(); renderRepairQueue();
 }
 let pendingExternalRegister = [];
+let lastReceiptSale = null;
 function showReceipt(sale){
+  lastReceiptSale = sale;
   const body = document.getElementById('receiptBody');
   const custName = sale.customerId ? (customers.find(c=>c.id===sale.customerId)||{}).name : 'Cliente general';
   body.innerHTML = `
@@ -1478,6 +1513,35 @@ function showReceipt(sale){
     </div>`;
   document.getElementById('receiptModal').classList.add('show');
 }
+document.getElementById('printReceiptBtn').addEventListener('click', ()=>{
+  const sale = lastReceiptSale;
+  if(!sale) return;
+  const custName = sale.customerId ? (customers.find(c=>c.id===sale.customerId)||{}).name : 'Cliente general';
+  const paymentLine = sale.method==='credito'
+    ? `<div class="pt-line"><span>Cargado a cuenta</span><span>${fmt(sale.total)}</span></div>`
+    : sale.method==='entrega'
+    ? `<div class="pt-line"><span>Pendiente (al entregar)</span><span>${fmt(sale.total)}</span></div>`
+    : `<div class="pt-line"><span>${methodLabel(sale.method)}</span><span>${fmt(sale.cash)}</span></div><div class="pt-line"><span>Cambio</span><span>${fmt(sale.change)}</span></div>`;
+  document.getElementById('printArea').innerHTML = `
+    <h4>DAPHYCEL</h4>
+    <div class="pt-center">Refacciones y accesorios</div>
+    <div class="pt-center">WhatsApp 55 7603 6579</div>
+    <div class="pt-dash"></div>
+    <div class="pt-line"><span>Folio</span><span>${sale.id}</span></div>
+    <div class="pt-line"><span>Fecha</span><span>${sale.time}</span></div>
+    <div class="pt-line"><span>Cliente</span><span>${custName}</span></div>
+    <div class="pt-dash"></div>
+    ${sale.items.map(it=>`<div class="pt-line"><span>${it.qty}× ${it.name}</span><span>${fmt(it.price*it.qty)}</span></div>`).join('')}
+    <div class="pt-dash"></div>
+    <div class="pt-line"><span>Subtotal</span><span>${fmt(sale.subtotal)}</span></div>
+    <div class="pt-line"><span>IVA</span><span>${fmt(sale.iva)}</span></div>
+    <div class="pt-line" style="font-weight:700;"><span>Total</span><span>${fmt(sale.total)}</span></div>
+    ${paymentLine}
+    <div class="pt-dash"></div>
+    <div class="pt-center">¡Gracias por su compra!</div>
+  `;
+  window.print();
+});
 
 /* ============================================================
    POS — submenú (Venta / Cancelaciones / Equipos para reparar)
@@ -2428,7 +2492,7 @@ document.getElementById('posScanBtn').addEventListener('click', posScan);
 document.getElementById('posScanInput').addEventListener('keydown', e=>{ if(e.key==='Enter') posScan(); });
 document.getElementById('cashInput').addEventListener('input', updateChange);
 document.getElementById('cobrarBtn').addEventListener('click', cobrar);
-document.getElementById('clearTicket').addEventListener('click', ()=>{ ticket={}; document.getElementById('cashInput').value=''; renderTicket(); });
+document.getElementById('clearTicket').addEventListener('click', ()=>{ ticket={}; externalItemsInfo={}; lastAutoFilledCash=null; document.getElementById('cashInput').value=''; renderTicket(); });
 
 /* ============================================================
    INIT
